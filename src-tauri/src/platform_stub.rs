@@ -29,6 +29,39 @@ pub fn read_dns_values(_adapter_id: &str) -> Option<(String, String)> {
     None
 }
 
+pub fn read_ipv6_dns_values(_adapter_id: &str) -> Option<(String, String)> {
+    None
+}
+
+/// Non-Windows tests and builds still exercise the real parser through `curl`.
+pub fn http_get_text(url: &str, timeout_secs: u32) -> Result<String, CommandError> {
+    let timeout = timeout_secs.to_string();
+    let output = std::process::Command::new("curl")
+        .args([
+            "-sS",
+            "-L",
+            "--max-time",
+            timeout.as_str(),
+            "--proto",
+            "=https",
+            "--proto-redir",
+            "=https",
+            url,
+        ])
+        .output()
+        .map_err(|error| CommandError {
+            code: "SYNC_FETCH_FAILED".to_string(),
+            message: format!("Could not start curl: {error}"),
+        })?;
+    if !output.status.success() {
+        return Err(CommandError {
+            code: "SYNC_FETCH_FAILED".to_string(),
+            message: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        });
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 pub fn netsh_dns_output(_adapter_name: &str) -> Option<String> {
     None
 }

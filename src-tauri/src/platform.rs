@@ -198,6 +198,19 @@ pub fn read_dns_values(adapter_id: &str) -> Option<(String, String)> {
     Some((static_servers, dhcp_servers))
 }
 
+/// Raw `NameServer` (static) / `DhcpNameServer` values of the adapter's Tcpip6
+/// key, the IPv6 counterpart of [`read_dns_values`].
+pub fn read_ipv6_dns_values(adapter_id: &str) -> Option<(String, String)> {
+    let path = format!(
+        "SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters\\Interfaces\\{adapter_id}"
+    );
+    let key = open_reg_key(&path)?;
+    let static_servers = read_reg_string(key, "NameServer").unwrap_or_default();
+    let dhcp_servers = read_reg_string(key, "DhcpNameServer").unwrap_or_default();
+    unsafe { RegCloseKey(key) };
+    Some((static_servers, dhcp_servers))
+}
+
 /// Hidden `netsh` read used only when the registry lookup failed.
 pub fn netsh_dns_output(adapter_name: &str) -> Option<String> {
     let output = std::process::Command::new("netsh")
@@ -366,6 +379,52 @@ fn run_elevated(args: &[String]) -> Result<(), CommandError> {
     } else {
         Err(elevation_required())
     }
+}
+
+/// Hidden `curl` fetch with a hard timeout. `--proto`/`--proto-redir` stop a
+/// redirect from downgrading to `http` or `file`, and `CREATE_NO_WINDOW` keeps
+/// the console from flashing.
+pub fn http_get_text(url: &str, timeout_secs: u32) -> Result<String, CommandError> {
+    let timeout = timeout_secs.to_string();
+    let output = hidden("curl")
+        .args([
+            "-sS",
+            "-L",
+            "--max-time",
+            timeout.as_str(),
+            "--proto",
+            "=https",
+            "--proto-redir",
+            "=https",
+            url,
+        ])
+        .output()
+        .map_err(|error| CommandError {
+            code: "SYNC_FETCH_FAILED".to_string(),
+            message: format!("Could not start curl: {error}"),
+        })?;
+    if !output.status.success() {
+        let text = output_text(&output);
+        return Err(CommandError {
+            code: "SYNC_FETCH_FAILED".to_string(),
+            message: if text.is_empty() {
+                format!(
+                    "The sync request failed with exit code {:?}.",
+                    output.status.code()
+                )
+            } else {
+                text
+            },
+        });
+    }
+    let body = String::from_utf8_lossy(&output.stdout).into_owned();
+    if body.trim().is_empty() {
+        return Err(CommandError {
+            code: "SYNC_FETCH_FAILED".to_string(),
+            message: "The sync URL returned an empty body.".to_string(),
+        });
+    }
+    Ok(body)
 }
 
 pub fn flush_dns_cache() -> Result<(), CommandError> {

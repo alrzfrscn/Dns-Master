@@ -50,6 +50,8 @@ export interface DnsServer {
   ipv6?: string[];
   /** True for user-created entries that are not written back to the seed file. */
   custom?: boolean;
+  /** True for entries pulled by the GitHub manifest sync. */
+  synced?: boolean;
 }
 
 /** Result of a single latency probe. */
@@ -208,6 +210,66 @@ export interface AppSettings {
   autoConnect: boolean;
   minimizeToTray: boolean;
   notifications: boolean;
+}
+
+/** One resolver in a GitHub manifest payload (`sync_github_dns_list`). */
+export interface SyncedDnsServer {
+  id: string;
+  name: string;
+  nameFa: string | null;
+  provider: string;
+  primary: string;
+  secondary: string;
+  category: DnsCategory;
+  tags: string[];
+  description: string | null;
+}
+
+/** The resolver Windows had before the last `set_dns`. */
+export interface DnsRollbackSnapshot {
+  adapterId: string;
+  mode: DnsMode;
+  primary: string | null;
+  secondary: string | null;
+  /** Unix epoch ms. */
+  capturedAt: number;
+}
+
+/** Settings as stored on disk (`PersistedAppState.settings`). */
+export interface PersistedSettings {
+  launchWithWindows: boolean;
+  reapplyLastResolver: boolean;
+  minimizeToTray: boolean;
+  desktopNotifications: boolean;
+  githubSyncUrl: string;
+  preferredAdapterId: string;
+  lastActiveDnsId: string;
+}
+
+/** Whole user state as stored in `%APPDATA%\com.dnsmaster.desktop\state.json`. */
+export interface PersistedAppState {
+  customDns: DnsServer[];
+  syncedDns: DnsServer[];
+  pinnedServerIds: string[];
+  settings: PersistedSettings;
+  previousDnsSnapshot: DnsRollbackSnapshot | null;
+}
+
+/** IPv6 resolver registration read from Windows. */
+export interface Ipv6DnsState {
+  adapterId: string;
+  /** True when the static IPv6 resolver is `::1` (leak guard on). */
+  guarded: boolean;
+  mode: "guard" | "static" | "dhcp" | "unknown";
+  servers: string[];
+}
+
+/** One resolver finished inside a running sweep (`benchmark:progress`). */
+export interface BenchmarkProgressPayload {
+  completed: number;
+  total: number;
+  currentServerId: string;
+  result: DnsPingResult;
 }
 
 export type ViewId = "dashboard" | "vault" | "tools" | "settings";

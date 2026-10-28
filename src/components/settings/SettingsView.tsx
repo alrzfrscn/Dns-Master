@@ -153,10 +153,10 @@ export function SettingsView() {
           </div>
 
           <p className="mt-2 text-[9px] leading-relaxed text-ink-500">
-            Pull a curated list from any GitHub raw URL. The payload must expose a{" "}
+            Pull a curated list from any HTTPS GitHub raw URL. The payload may be a top-level array or an
+            object with a{" "}
             <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[8px] text-ink-300">servers[]</code>{" "}
-            array matching{" "}
-            <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[8px] text-ink-300">DnsServer</code>.
+            array. Entries are validated, deduplicated by primary IPv4 and merged into the vault.
           </p>
 
           <div className="mt-2 flex items-center gap-1.5">
@@ -191,7 +191,7 @@ export function SettingsView() {
               {urlValid ? "raw manifest url is valid" : "needs an https url ending in .json"}
             </span>
             <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-ink-600">
-              {servers.length} in memory
+              {servers.length} persisted
             </span>
           </div>
         </GlassCard>
@@ -227,11 +227,16 @@ export function SettingsView() {
               "get_current_dns",
               "set_dns",
               "reset_dns",
+              "restore_previous_dns",
               "flush_dns_cache",
               "set_ipv6_enabled",
+              "get_ipv6_dns_state",
               "ping_dns_server",
               "benchmark_dns_servers",
               "run_bypass_probe",
+              "load_persisted_state",
+              "save_persisted_state",
+              "sync_github_dns_list",
             ].map((command) => (
               <span key={command} className="truncate font-mono text-[8px] leading-relaxed text-ink-400">
                 {command}()
@@ -301,7 +306,7 @@ export function SettingsView() {
           <div className="mt-2 space-y-1.5">
             {[
               { label: "App", value: "Dns Master 0.1.0" },
-              { label: "Channel", value: "Phase 3 · live core" },
+              { label: "Channel", value: "Phase 4 · persistent core" },
               { label: "Frontend", value: "React 19 · Vite 7" },
               { label: "Styling", value: "Tailwind CSS 4" },
               { label: "Backend", value: "Tauri 2 · Win32 API" },
@@ -341,7 +346,9 @@ export function SettingsView() {
           </div>
           <p className="mt-1.5 text-[8.5px] leading-relaxed text-ink-500">
             DNS writes, cache flushes, the IPv6 leak guard, UDP:53 benchmarks and TLS bypass probes are live.
-            Windows elevates only the adapter write itself, through a standard UAC prompt.
+            Windows elevates only the adapter write itself. Custom resolvers, pins and settings persist to{" "}
+            <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[7.5px] text-ink-300">state.json</code>,
+            and the resolver from before the last apply can be rolled back from the dashboard.
           </p>
           <div className="mt-2 flex items-center justify-between border-t border-white/[0.05] pt-1.5 font-mono text-[7px] uppercase tracking-[0.08em] text-ink-600">
             <span>ctrl + 1…4 views</span>

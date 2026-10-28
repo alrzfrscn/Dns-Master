@@ -1,4 +1,4 @@
-import { ArrowUpRight, Cable, Gauge, Globe2, ShieldCheck, Unplug, Zap } from "lucide-react";
+import { ArrowUpRight, Cable, Gauge, Globe2, History, ShieldCheck, Unplug, Zap } from "lucide-react";
 import { useApp } from "../../store/AppStore";
 import { cn } from "../../lib/cn";
 import { latencyQuality, latencyTone, formatDuration } from "../../lib/format";
@@ -11,12 +11,15 @@ export function ActiveConnectionCard() {
     connection,
     activeDns,
     activeAdapter,
+    activeAdapterId,
     pinnedServers,
     applyDns,
     disconnect,
     resetDhcp,
     stats,
     dnsConfig,
+    previousDnsSnapshot,
+    rollbackDns,
   } = useApp();
 
   const connected = connection.phase === "connected" && activeDns !== null;
@@ -24,6 +27,8 @@ export function ActiveConnectionCard() {
   const systemStatic = !connected && connection.mode === "static";
   const recommended = pinnedServers[0] ?? null;
   const uptime = connection.since ? formatDuration(Date.now() - connection.since) : null;
+  const rollbackAvailable =
+    previousDnsSnapshot !== null && previousDnsSnapshot.adapterId === activeAdapterId;
 
   const statusTone = connected
     ? "border-mint/30 bg-mint/10 text-mint"
@@ -152,10 +157,23 @@ export function ActiveConnectionCard() {
           <Globe2 size={9} className="text-ink-600" />
           {activeAdapter.gateway} · gw
         </span>
-        <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-ink-500">
-          <ShieldCheck size={9} className={connected ? "text-mint" : "text-ink-600"} />
-          {uptime ? `up ${uptime}` : "no override"}
-        </span>
+        <div className="flex items-center gap-2">
+          {rollbackAvailable && (
+            <button
+              type="button"
+              onClick={() => void rollbackDns()}
+              disabled={busy}
+              title={`Restore ${previousDnsSnapshot?.primary ?? "DHCP"} from before the last apply`}
+              className="flex h-[18px] items-center gap-1 rounded border border-violet/30 bg-violet/[0.08] px-1.5 font-mono text-[7px] uppercase tracking-[0.1em] text-violet transition-colors hover:bg-violet/15 disabled:opacity-50"
+            >
+              <History size={8} /> rollback
+            </button>
+          )}
+          <span className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-ink-500">
+            <ShieldCheck size={9} className={connected ? "text-mint" : "text-ink-600"} />
+            {uptime ? `up ${uptime}` : "no override"}
+          </span>
+        </div>
       </div>
     </GlassCard>
   );

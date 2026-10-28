@@ -601,3 +601,135 @@ Live run on this host (real resolver `1.1.1.1`):
 6. **GitHub sync** — the pull is still simulated; implement fetch, schema validation and merge.
 7. **Packaging** — run `npm run tauri build` with WebView2 present; decide whether to ship an elevated manifest or keep per-action UAC.
 8. **Optional TLS fidelity** — add a valid `key_share` so servers reply with a full ServerHello; reachability is already correct without it.
+
+---
+
+# Dns Master — Phase 4 Completion Report
+
+Date: 2026-10-29
+Scope: persistent disk storage, real GitHub raw-JSON sync, IPv6 read-back, DNS rollback, streamed benchmark progress
+
+## 25. Persistent state (`src-tauri/src/store.rs`)
+
+User state now survives a restart in `%APPDATA%\com.dnsmaster.desktop\state.json`. When `APPDATA` is unset (tests, service accounts) the same file lands under `%TEMP%\com.dnsmaster.desktop\`.
+
+```rust
+#[serde(rename_all = "camelCase", default)]
+struct PersistedAppState {
+    custom_dns: Vec<DnsEntry>,          // user-created resolvers
+    synced_dns: Vec<DnsEntry>,          // rows pulled by GitHub sync
+    pinned_server_ids: Vec<String>,
+    settings: PersistedSettings,        // launchWithWindows, reapplyLastResolver,
+                                        // minimizeToTray, desktopNotifications,
+                                        // githubSyncUrl, preferredAdapterId, lastActiveDnsId
+    previous_dns_snapshot: Option<DnsRollbackSnapshot>,
+}
+
+#[serde(rename_all = "camelCase", default)]
+struct DnsRollbackSnapshot { adapter_id, mode, primary, secondary, captured_at }
+```
+
+- **Schema evolution** — container-level `#[serde(default)]` plus a `Default` impl for `PersistedSettings`. A file written by an older build loads with defaults for every missing field, verified by the `older_files_get_defaults_for_new_fields` test.
+- **Atomic writes** — `save_to` writes `state.json.tmp`, then `std::fs::rename` over `state.json` (on Windows this is `MoveFileEx` with replace-existing). A crash or power loss leaves the old file or the new one, never a truncated one. `load_from` treats a missing or corrupt file as a fresh install instead of failing.
+- **Commands** (private, `#[tauri::command(async)]`):
+  - `load_persisted_state() -> Result<PersistedAppState, CommandError>`
+  - `save_persisted_state(state) -> Result<(), CommandError>` (`STATE_WRITE_FAILED`)
+- **Rollback snapshot writes** — `set_dns` captures `get_current_dns` before mutating and stores the snapshot with a read-modify-write of the same file (`store::record_snapshot`). A failed snapshot write never fails the DNS change; it only costs the rollback button.
+
+## 26. Real GitHub raw-JSON sync (`src-tauri/src/sync.rs`)
+
+`sync_github_dns_list(url)` replaces the simulated pull:
+
+1. **URL guard** — must start with `https://`. `localhost`, `.local`, `127/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `0.0.0.0`, broadcast, `::1`, `fc00::/7` and `fe80::/10` are rejected with `SYNC_INVALID_URL`.
+2. **Fetch** — hidden `curl.exe` (`CREATE_NO_WINDOW`, built into Windows 10/11) with `--max-time 8`, `-sS -L`, and `--proto =https --proto-redir =https` so a redirect cannot downgrade to `http` or `file`. No new crate; `Cargo.toml` and `Cargo.lock` are unchanged. Failures are `SYNC_FETCH_FAILED` with curl's own message.
+3. **Parse** — both a top-level `[...]` array and `{ "servers": [...] }` are accepted. Every entry is validated:
+   - non-empty `name`, valid IPv4 `primary` (not `0.0.0.0`);
+   - `secondary` optional/empty or valid IPv4;
+   - `category` normalized to `gaming | sanction | security | general` (unknown → `general`, aliases such as `game`, `bypass`, `privacy` are mapped);
+   - `id` from the manifest or derived from the primary, `provider` defaults to the name, `tags` default to `["github"]`;
+   - duplicates collapse on the primary IPv4 address.
+   Empty, non-JSON, wrong-root and invalid entries are `SYNC_INVALID_MANIFEST` with the offending entry named.
+4. **Frontend merge** (`syncFromGithub`) — merges into the live list by primary IPv4, keeps real `latency`/`jitter`/`uptime` and pins, never overwrites a user-created (`custom`) row, marks pulled rows `synced: true`, and toasts `N verified · A added · U updated`. The debounced save persists the merged set.
+
+## 27. IPv6 read-back
+
+- `platform::read_ipv6_dns_values` reads `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters\Interfaces\{GUID}` (`NameServer`, `DhcpNameServer`).
+- `classify_ipv6_dns` reports `guarded: true, mode: "guard"` when the static IPv6 resolver is `::1`, otherwise `static`, `dhcp` or `unknown` with the parsed address list.
+- `get_ipv6_dns_state(adapterId) -> Ipv6DnsState` is a new read command. `AppStore` seeds the toggle with `!guarded` on mount, on adapter switch and after every successful toggle, so `NetworkTools` now reflects Windows instead of local UI state.
+
+## 28. Previous-DNS rollback
+
+- `restore_previous_dns(adapterId) -> DnsConfig` reads `PersistedAppState.previous_dns_snapshot` (so it survives a restart), refuses a snapshot for a different adapter (`NO_ROLLBACK`), then:
+  - static snapshot → `netsh ... static <primary>` + optional `add dnsservers ... index=2`, flush, verify the primary read-back;
+  - DHCP snapshot → `netsh ... source=dhcp`, flush, verify `mode == "dhcp"`.
+- The snapshot is cleared after a verified restore so it cannot be replayed.
+- `ActiveConnectionCard` shows a compact **rollback** button in the footer whenever a snapshot exists for the active adapter; the action re-reads the verified config, re-matches the resolver id and toasts the restored servers.
+
+## 29. Streamed benchmark progress
+
+- `benchmark_dns_servers` now takes `app: tauri::AppHandle` and emits `benchmark:progress` from inside the worker scope:
+
+```ts
+{ completed, total, currentServerId, result: { serverId, latencyMs, jitterMs, packetLossPercent, reachable } }
+```
+
+- The sweep itself was split into `benchmark_sweep(servers, on_result)`, which keeps the 15-worker bounded pool and lets the unit tests call it without an `AppHandle`.
+- `AppStore.runBenchmark` subscribes with `listenBenchmarkProgress` before invoking, updates the matching benchmark row (status, latency, jitter, loss, score), the server row and the percentage on every event, then unsubscribes in `finally` and writes the final sorted result. `BenchmarkPanel` therefore animates per resolver instead of jumping to 100%.
+
+## 30. Frontend wiring
+
+- `src/types/network.ts` — `DnsRollbackSnapshot`, `PersistedSettings`, `PersistedAppState`, `SyncedDnsServer`, `Ipv6DnsState`, `BenchmarkProgressPayload`, plus `DnsServer.synced`.
+- `src/lib/tauri.ts` — `fetchPersistedState`, `savePersistedState`, `invokeRestorePreviousDns`, `fetchIpv6DnsState`, `invokeSyncGithubDnsList`, `listenBenchmarkProgress`.
+- `src/store/AppStore.tsx`:
+  - mount loads adapters and the state file in parallel, merges custom/synced/seed rows (dedupe by primary IPv4, stored pin ids win), hydrates settings and the rollback snapshot, selects `preferredAdapterId` when it is still present else the default-route adapter, and reads IPv6 state;
+  - `reapplyLastResolver` does not fire a surprise UAC prompt on boot: when the last resolver is not bound, a toast offers it for a one-click engage;
+  - a 600 ms debounced save writes custom/synced rows, pins, settings (including `preferredAdapterId` and `lastActiveDnsId`) and the rollback snapshot through `save_persisted_state`;
+  - `rollbackDns`, real `syncFromGithub`, IPv6 re-read on adapter switch.
+- Custom resolver deletion already existed as `removeDns` (trash button on `custom` rows in `DnsListManager`); it now persists through the same debounced save, so the requested delete action is covered without a second API.
+- `SettingsView` lists the new commands, shows `Phase 4 · persistent core` and `N persisted`, and documents the accepted manifest shapes.
+
+## 31. Tests and verification
+
+```text
+cargo test --manifest-path src-tauri/Cargo.toml
+→ 42 passed; 0 failed (lib)
+→ 0 failed (main, doc-tests)
+
+cargo fmt -- --check
+→ clean
+
+npx tsc --noEmit
+→ exit 0
+
+npm run build
+→ tsc --noEmit && vite build
+→ built in 10.13s
+→ dist/assets/index-*.js  358.14 kB │ gzip 105.89 kB
+→ dist/assets/charts-*.js 365.26 kB │ gzip 107.41 kB
+→ dist/assets/event-*.js    1.41 kB │ gzip   0.68 kB   (new: event listener)
+```
+
+New coverage (12 tests):
+
+- `PersistedAppState` round-trip of every field; older files get defaults for new fields.
+- Atomic save → load in a temp dir, overwrite, temp file renamed away.
+- Missing and corrupt files fall back to defaults; state path lives under `com.dnsmaster.desktop`.
+- Manifest: array, `{ servers: [...] }`, category normalization, dedupe by primary, empty secondary handling.
+- Malformed manifests: non-JSON, `[]`, `{}`, non-object entry, missing name/primary, invalid IPv4, `0.0.0.0`, invalid secondary → `SYNC_INVALID_MANIFEST`.
+- URL guard: https accepted; http, file, localhost, loopback, private, link-local, `[::1]`, `.local`, hostless rejected → `SYNC_INVALID_URL`.
+- IPv6 classification: `::1` → guard, DHCP list → dhcp, other static → static, empty → unknown.
+- Rollback snapshot capture from static/DHCP configs and the resulting `RestorePlan`.
+
+Live host checks: `curl.exe` fetched a real `raw.githubusercontent.com` URL through the same arguments the command uses (exit 0), and the existing live UDP:53 sweep, bypass probe and flush tests still pass.
+
+## 32. Known limits / not executed
+
+- `set_dns`, `restore_previous_dns` and `set_ipv6_enabled` were not run against the host's live adapter in this phase (they change the real resolver and need UAC approval). They share the Phase 3 netsh argument builders and are covered by validation, adapter and plan tests; the first real run should be watched.
+- The snapshot is cleared after a verified restore, so "undo the rollback" is not available; the previous resolver is read fresh on the next apply.
+- First-run pin detection is a heuristic: a state file with no custom rows, no synced rows and no pins is treated as a fresh install and keeps the seed pins. A user who unpins all four and has no custom/synced resolvers gets them back after a restart.
+- `reapplyLastResolver` surfaces the last resolver instead of writing DNS at boot, deliberately avoiding an unattended UAC prompt.
+- Sync requires `curl.exe` (present on Windows 10 1803+ / 11); there is no PowerShell fallback. Manifest entries with an invalid row reject the whole manifest rather than partially applying it.
+- The sync merge never deletes rows that disappeared from the remote manifest; users can delete their own custom rows only.
+- Benchmark progress events are best-effort: if the event bridge is unavailable the sweep still completes and the UI writes the final batch.
+- No automated frontend test runner; the store logic is verified by TypeScript plus the Rust contract tests.
+

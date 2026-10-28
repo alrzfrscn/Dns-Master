@@ -16,8 +16,11 @@ import type {
   ConnectionState,
   DnsCategory,
   DnsConfig,
+  DnsRollbackSnapshot,
   DnsServer,
   NetworkAdapter,
+  PersistedAppState,
+  PersistedSettings,
   TrafficPoint,
   TrafficStats,
   ViewId,
@@ -26,15 +29,21 @@ import { BYPASS_TARGETS, MOCK_ADAPTERS } from "../data/mock";
 import { DEFAULT_ADAPTER, SEED_SERVERS } from "../data/servers";
 import {
   fetchCurrentDns,
+  fetchIpv6DnsState,
   fetchLiveTraffic,
   fetchNetworkAdapters,
+  fetchPersistedState,
   invokeBenchmarkDnsServers,
   invokeFlushDns,
   invokePingDnsServer,
   invokeResetDns,
+  invokeRestorePreviousDns,
   invokeRunBypassProbe,
   invokeSetDns,
   invokeSetIpv6,
+  invokeSyncGithubDnsList,
+  listenBenchmarkProgress,
+  savePersistedState,
 } from "../lib/tauri";
 
 const HISTORY_LENGTH = 48;
@@ -84,6 +93,9 @@ interface AppContextValue {
   addCustomDns: (input: CustomDnsInput) => DnsServer;
   removeDns: (id: string) => void;
   togglePin: (id: string) => void;
+  /** Resolver Windows had before the last apply, null when there is none. */
+  previousDnsSnapshot: DnsRollbackSnapshot | null;
+  rollbackDns: () => Promise<void>;
 
   ipv6Enabled: boolean;
   toggleIpv6: () => void;
@@ -166,6 +178,68 @@ const DEFAULT_SETTINGS: AppSettings = {
   notifications: true,
 };
 
+const settingsToPersisted = (
+  settings: AppSettings,
+  adapterId: string,
+  lastActiveDnsId: string | null,
+): PersistedSettings => ({
+  launchWithWindows: settings.autoStart,
+  reapplyLastResolver: settings.autoConnect,
+  minimizeToTray: settings.minimizeToTray,
+  desktopNotifications: settings.notifications,
+  githubSyncUrl: settings.githubRawUrl,
+  preferredAdapterId: adapterId,
+  lastActiveDnsId: lastActiveDnsId ?? "",
+});
+
+const settingsFromPersisted = (persisted: PersistedSettings): AppSettings => ({
+  githubRawUrl: persisted.githubSyncUrl || DEFAULT_SETTINGS.githubRawUrl,
+  autoStart: persisted.launchWithWindows,
+  autoConnect: persisted.reapplyLastResolver,
+  minimizeToTray: persisted.minimizeToTray,
+  notifications: persisted.desktopNotifications,
+});
+
+/**
+ * Persisted custom/synced rows first (the user's own entries win), then the
+ * bundled seed. Duplicates collapse on the primary IPv4 address, and stored pin
+ * ids decide which rows stay pinned.
+ */
+function mergePersistedServers(
+  seed: DnsServer[],
+  persisted: PersistedAppState | null,
+): DnsServer[] {
+  const byPrimary = new Map<string, DnsServer>();
+  const add = (server: DnsServer) => {
+    if (!server.primary || byPrimary.has(server.primary)) return;
+    byPrimary.set(server.primary, server);
+  };
+  persisted?.customDns.forEach((server) => add({ ...server, custom: true, synced: false }));
+  persisted?.syncedDns.forEach((server) => add({ ...server, custom: false, synced: true }));
+  seed.forEach(add);
+
+  if (!persisted) return [...byPrimary.values()];
+  // A state file with no rows and no pins is a first run, not "unpin
+  // everything": keep the seed pins in that case.
+  const hasUserState =
+    persisted.pinnedServerIds.length > 0 ||
+    persisted.customDns.length > 0 ||
+    persisted.syncedDns.length > 0;
+  if (!hasUserState) return [...byPrimary.values()];
+  const pins = new Set(persisted.pinnedServerIds);
+  return [...byPrimary.values()].map((server) => ({ ...server, pinned: pins.has(server.id) }));
+}
+
+function snapshotFromConfig(config: DnsConfig): DnsRollbackSnapshot {
+  return {
+    adapterId: config.adapterId,
+    mode: config.mode,
+    primary: config.primary,
+    secondary: config.secondary,
+    capturedAt: Date.now(),
+  };
+}
+
 function makeBypassRows(): BypassResult[] {
   return BYPASS_TARGETS.map((target) => ({
     targetId: target.id,
@@ -203,12 +277,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bypassRunning, setBypassRunning] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [previousDnsSnapshot, setPreviousDnsSnapshot] = useState<DnsRollbackSnapshot | null>(null);
   const [toasts, setToasts] = useState<AppContextValue["toasts"]>([]);
 
   const actionToken = useRef(0);
   const benchmarkRunning = useRef(false);
   const tickRef = useRef(0);
   const serversRef = useRef(servers);
+  const hydrated = useRef(false);
   const syntheticRef = useRef({ down: initialStats.downKbps, up: initialStats.upKbps });
 
   useEffect(() => {
@@ -247,10 +323,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ------------------------------------------------------------------ *
    * Rust bridge: real adapters, resolver mode, live counters
    * ------------------------------------------------------------------ */
-  const syncDns = useCallback(async (adapterId: string) => {
+  const syncDns = useCallback(async (adapterId: string, list?: DnsServer[]) => {
     const config = await fetchCurrentDns(adapterId);
-    if (!config) return;
-    const matched = serversRef.current.find(
+    if (!config) return null;
+    const pool = list ?? serversRef.current;
+    const matched = pool.find(
       (server) =>
         config.servers.includes(server.primary) || (server.secondary !== "" && config.servers.includes(server.secondary)),
     );
@@ -264,28 +341,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
       since: prev.adapterId === adapterId ? prev.since : null,
       error: null,
     }));
+    return matched?.id ?? null;
+  }, []);
+
+  /** Seeds the IPv6 toggle from the real resolver registration. */
+  const syncIpv6 = useCallback(async (adapterId: string) => {
+    const state = await fetchIpv6DnsState(adapterId);
+    if (state) setIpv6Enabled(!state.guarded);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const real = await fetchNetworkAdapters();
+      const [real, persisted] = await Promise.all([fetchNetworkAdapters(), fetchPersistedState()]);
       if (cancelled) return;
+
+      const merged = mergePersistedServers(SEED_SERVERS, persisted);
+      serversRef.current = merged;
+      setServers(merged);
+      if (persisted) {
+        setSettings(settingsFromPersisted(persisted.settings));
+        setPreviousDnsSnapshot(persisted.previousDnsSnapshot);
+      }
+      hydrated.current = true;
+
       if (real && real.length > 0) {
-        const preferred = real.find((adapter) => adapter.isDefault) ?? real[0];
+        const preferred =
+          real.find((adapter) => adapter.id === persisted?.settings.preferredAdapterId) ??
+          real.find((adapter) => adapter.isDefault) ??
+          real[0];
         setAdapters(real);
         setBridgeReady(true);
         setActiveAdapterId(preferred.id);
-        void syncDns(preferred.id);
+        const bound = await syncDns(preferred.id, merged);
+        if (cancelled) return;
+        void syncIpv6(preferred.id);
+        const lastId = persisted?.settings.lastActiveDnsId;
+        if (persisted?.settings.reapplyLastResolver && lastId && lastId !== bound) {
+          const last = merged.find((server) => server.id === lastId);
+          if (last) {
+            pushToast(
+              "Last resolver available",
+              "info",
+              `${last.name} is not bound · engage it from the deck`,
+            );
+          }
+        }
         return;
       }
-      void syncDns(activeAdapterId);
+      void syncDns(activeAdapterId, merged);
     })();
     return () => {
       cancelled = true;
     };
-    // Adapter list is read once; the sampler follows activeAdapterId afterwards.
-  }, []);
+    // Adapter list and state file are read once; the sampler follows activeAdapterId afterwards.
+  }, [pushToast, syncDns, syncIpv6]);
+
+  /* ------------------------------------------------------------------ *
+   * Persistence: debounced atomic save of custom/synced rows, pins and
+   * settings whenever the user changes anything.
+   * ------------------------------------------------------------------ */
+  const persistPayload = useMemo<PersistedAppState | null>(() => {
+    if (!hydrated.current) return null;
+    return {
+      customDns: servers.filter((server) => server.custom),
+      syncedDns: servers.filter((server) => server.synced),
+      pinnedServerIds: servers.filter((server) => server.pinned).map((server) => server.id),
+      settings: settingsToPersisted(settings, activeAdapterId, activeDnsId),
+      previousDnsSnapshot,
+    };
+  }, [servers, settings, activeAdapterId, activeDnsId, previousDnsSnapshot]);
+
+  useEffect(() => {
+    if (!bridgeReady || !persistPayload) return;
+    const id = window.setTimeout(() => void savePersistedState(persistPayload), 600);
+    return () => window.clearTimeout(id);
+  }, [bridgeReady, persistPayload]);
+
 
   /* ------------------------------------------------------------------ *
    * Live traffic sampler: real `get_live_traffic` deltas with a
@@ -417,6 +549,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setServers((prev) =>
             prev.map((s) => (s.id === id ? { ...s, uptime: clamp(s.uptime + 0.1, 0, 100) } : s)),
           );
+          // The core stored the pre-apply resolver; mirror it locally so the
+          // rollback button and the next debounced save keep it.
+          if (dnsConfig && dnsConfig.adapterId === activeAdapterId) {
+            setPreviousDnsSnapshot(snapshotFromConfig(dnsConfig));
+          } else {
+            void fetchPersistedState().then((state) => {
+              if (state?.previousDnsSnapshot) setPreviousDnsSnapshot(state.previousDnsSnapshot);
+            });
+          }
           pushToast(
             `${target.name} applied`,
             "success",
@@ -430,7 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       })();
     },
-    [servers, activeAdapterId, activeAdapter.name, bridgeReady, pushToast],
+    [servers, activeAdapterId, activeAdapter.name, bridgeReady, dnsConfig, pushToast],
   );
 
   const releaseDns = useCallback(
@@ -486,6 +627,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(() => releaseDns("disconnecting", 700), [releaseDns]);
   const resetDhcp = useCallback(() => releaseDns("resetting", 850), [releaseDns]);
+
+  /** Puts back the resolver Windows had before the last apply (or DHCP). */
+  const rollbackDns = useCallback(async () => {
+    if (!previousDnsSnapshot) return;
+    const token = ++actionToken.current;
+    setConnection((prev) => ({ ...prev, phase: "resetting", error: null }));
+
+    if (!bridgeReady) {
+      window.setTimeout(() => {
+        if (token !== actionToken.current) return;
+        setPreviousDnsSnapshot(null);
+        pushToast("Previous DNS restored", "info", "Simulated · the Tauri core is offline");
+      }, 700);
+      return;
+    }
+
+    try {
+      const config = await invokeRestorePreviousDns(activeAdapterId);
+      if (token !== actionToken.current) return;
+      const matched = serversRef.current.find((server) => config.servers.includes(server.primary));
+      setDnsConfig(config);
+      setActiveDnsId(matched?.id ?? null);
+      setConnection({
+        phase: matched ? "connected" : "idle",
+        mode: config.mode,
+        activeDnsId: matched?.id ?? null,
+        adapterId: activeAdapterId,
+        since: matched ? Date.now() : null,
+        error: null,
+      });
+      setPreviousDnsSnapshot(null);
+      pushToast(
+        "Previous DNS restored",
+        "success",
+        config.servers.join(" · ") || "carrier assigned (DHCP)",
+      );
+    } catch (error) {
+      if (token !== actionToken.current) return;
+      const message = describeError(error);
+      setConnection((prev) => ({ ...prev, phase: "error", error: message }));
+      pushToast("Rollback failed", "error", message);
+    }
+  }, [previousDnsSnapshot, bridgeReady, activeAdapterId, pushToast]);
 
   const pingServer = useCallback(
     async (id: string): Promise<number> => {
@@ -620,14 +804,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         if (bridgeReady) {
-          // One bounded parallel UDP:53 sweep; the core sorts but the UI owns scores.
+          // One bounded parallel UDP:53 sweep; the core sorts but the UI owns
+          // scores. `benchmark:progress` streams each finished resolver so the
+          // rows, percentage and current name move before the sweep ends.
+          const unlisten = await listenBenchmarkProgress((payload) => {
+            const ping = payload.result;
+            const reachable = ping.reachable;
+            const latency = reachable ? Math.round(ping.latencyMs) : null;
+            const jitter = reachable ? round(ping.jitterMs) : null;
+            const loss = ping.packetLossPercent;
+            const score =
+              reachable && latency !== null && jitter !== null
+                ? Math.round(clamp(100 - latency * 0.72 - jitter * 1.6 - loss * 8, 4, 99))
+                : 0;
+            setServers((prev) =>
+              prev.map((s) => (s.id === ping.serverId ? { ...s, latency, jitter } : s)),
+            );
+            setBenchmark((prev) =>
+              prev.running
+                ? {
+                    ...prev,
+                    progress: Math.round(
+                      (payload.completed / Math.max(1, payload.total)) * 100,
+                    ),
+                    currentId: ping.serverId,
+                    results: prev.results.map((row) =>
+                      row.serverId === ping.serverId
+                        ? {
+                            ...row,
+                            status: reachable ? "done" : "timeout",
+                            latencyMs: latency,
+                            jitterMs: jitter,
+                            lossPercent: loss,
+                            score,
+                          }
+                        : row,
+                    ),
+                  }
+                : prev,
+            );
+          });
+
           const pings = await invokeBenchmarkDnsServers(
             pool.map((s) => ({
               serverId: s.id,
               primary: s.primary,
               secondary: s.secondary || null,
             })),
-          );
+          ).finally(unlisten);
           const byId = new Map(pings.map((ping) => [ping.serverId, ping]));
 
           const results = pool.map((s): BenchmarkResult => {
@@ -758,8 +982,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       pushToast("Adapter switched", "info", adapter.name);
       void syncDns(id);
+      void syncIpv6(id);
     },
-    [adapters, pushToast, syncDns],
+    [adapters, pushToast, syncDns, syncIpv6],
   );
 
   const toggleIpv6 = useCallback(() => {
@@ -774,6 +999,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         await invokeSetIpv6(activeAdapterId, next);
         setIpv6Enabled(next);
+        void syncIpv6(activeAdapterId);
         pushToast(
           next ? "IPv6 resolution enabled" : "IPv6 DNS leak guard on",
           next ? "success" : "warning",
@@ -785,7 +1011,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pushToast("IPv6 change failed", "error", describeError(error));
       }
     })();
-  }, [ipv6Enabled, bridgeReady, activeAdapterId, pushToast]);
+  }, [ipv6Enabled, bridgeReady, activeAdapterId, pushToast, syncIpv6]);
 
   const flushDns = useCallback(async () => {
     if (flushing) return;
@@ -891,10 +1117,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setSyncing(true);
     pushToast("Pulling resolver list", "info", host);
-    await sleep(1600);
-    setSyncing(false);
-    pushToast("Resolver list synced", "success", "30 presets verified · no conflicts");
-  }, [settings.githubRawUrl, syncing, pushToast]);
+
+    if (!bridgeReady) {
+      await sleep(1600);
+      setSyncing(false);
+      pushToast("Resolver list synced", "success", "Simulated pull · the Tauri core is offline");
+      return;
+    }
+
+    try {
+      const incoming = await invokeSyncGithubDnsList(settings.githubRawUrl);
+      const current = serversRef.current;
+      const byPrimary = new Map(current.map((server) => [server.primary, server]));
+      const next = current.slice();
+      let added = 0;
+      let updated = 0;
+
+      for (const entry of incoming) {
+        const existing = byPrimary.get(entry.primary);
+        // A user-created resolver keeps its own name and never gets overwritten.
+        if (existing?.custom) continue;
+        const row: DnsServer = {
+          id: entry.id || existing?.id || `sync-${entry.primary.replace(/\./g, "-")}`,
+          name: entry.name,
+          nameFa: entry.nameFa ?? undefined,
+          provider: entry.provider || entry.name,
+          primary: entry.primary,
+          secondary: entry.secondary,
+          category: entry.category,
+          tags: entry.tags.length > 0 ? entry.tags : ["github"],
+          description: entry.description ?? undefined,
+          // Real measurements survive a sync; pins are handled separately.
+          latency: existing?.latency ?? null,
+          jitter: existing?.jitter ?? null,
+          uptime: existing?.uptime ?? 100,
+          pinned: existing?.pinned ?? false,
+          synced: true,
+        };
+        if (existing) {
+          next[next.indexOf(existing)] = row;
+          updated += 1;
+        } else {
+          next.push(row);
+          added += 1;
+        }
+        byPrimary.set(entry.primary, row);
+      }
+
+      serversRef.current = next;
+      setServers(next);
+      pushToast(
+        "Resolver list synced",
+        "success",
+        `${incoming.length} verified · ${added} added · ${updated} updated`,
+      );
+    } catch (error) {
+      pushToast("Sync failed", "error", describeError(error));
+    } finally {
+      setSyncing(false);
+    }
+  }, [settings.githubRawUrl, syncing, bridgeReady, pushToast]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -925,6 +1207,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCustomDns,
       removeDns,
       togglePin,
+      previousDnsSnapshot,
+      rollbackDns,
       ipv6Enabled,
       toggleIpv6,
       flushing,
@@ -968,6 +1252,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCustomDns,
       removeDns,
       togglePin,
+      previousDnsSnapshot,
+      rollbackDns,
       ipv6Enabled,
       toggleIpv6,
       flushing,

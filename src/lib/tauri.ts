@@ -1,11 +1,15 @@
 /** Thin, fail-safe bridge to Tauri: window chrome plus the Rust network core. */
 import type {
+  BenchmarkProgressPayload,
   BypassProbeResult,
   CommandError,
   DnsBenchmarkTarget,
   DnsConfig,
   DnsPingResult,
+  Ipv6DnsState,
   NetworkAdapter,
+  PersistedAppState,
+  SyncedDnsServer,
   TrafficStats,
 } from "../types/network";
 
@@ -125,3 +129,47 @@ export function invokeRunBypassProbe(
     resolverIp: resolverIp ?? null,
   });
 }
+
+/** Persisted state file; null when the core is absent or the file is unreadable. */
+export function fetchPersistedState(): Promise<PersistedAppState | null> {
+  return invokeSafe<PersistedAppState>("load_persisted_state");
+}
+
+/** Atomically replaces the state file (Rust writes `state.json.tmp`, then renames). */
+export function savePersistedState(state: PersistedAppState): Promise<void> {
+  return invokeCommand<void>("save_persisted_state", { state });
+}
+
+/** Restores the resolver Windows had before the last apply (read-back verified). */
+export function invokeRestorePreviousDns(adapterId: string): Promise<DnsConfig> {
+  return invokeCommand<DnsConfig>("restore_previous_dns", { adapterId });
+}
+
+/** True IPv6 resolver registration, so the toggle starts from Windows state. */
+export function fetchIpv6DnsState(adapterId: string): Promise<Ipv6DnsState | null> {
+  return invokeSafe<Ipv6DnsState>("get_ipv6_dns_state", { adapterId });
+}
+
+/** Real HTTPS fetch + validated manifest merge payload. */
+export function invokeSyncGithubDnsList(url: string): Promise<SyncedDnsServer[]> {
+  return invokeCommand<SyncedDnsServer[]>("sync_github_dns_list", { url });
+}
+
+/**
+ * Streams one event per finished resolver during a sweep. Returns a no-op
+ * unsubscribe outside Tauri or when the event bridge is unavailable.
+ */
+export async function listenBenchmarkProgress(
+  handler: (payload: BenchmarkProgressPayload) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    return await listen<BenchmarkProgressPayload>("benchmark:progress", (event) =>
+      handler(event.payload),
+    );
+  } catch {
+    return () => {};
+  }
+}
+

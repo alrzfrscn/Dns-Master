@@ -5,13 +5,16 @@
 //! RFC 1035 UDP:53 packets and TLS ClientHellos (see `dns.rs`). Field names use
 //! camelCase over the IPC boundary.
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 mod dns;
+mod store;
+mod sync;
 
 #[cfg(windows)]
 mod platform;
@@ -166,6 +169,28 @@ const BENCHMARK_THREADS: usize = 15;
 pub struct CommandError {
     pub code: String,
     pub message: String,
+}
+
+/// IPv6 resolver state read from `Tcpip6\...\Interfaces\{GUID}`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Ipv6DnsState {
+    pub adapter_id: String,
+    /// True when the static IPv6 resolver is `::1` (leak guard on).
+    pub guarded: bool,
+    /// "guard" | "static" | "dhcp" | "unknown"
+    pub mode: String,
+    pub servers: Vec<String>,
+}
+
+/// One resolver finished inside a running sweep.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkProgressPayload {
+    pub completed: usize,
+    pub total: usize,
+    pub current_server_id: String,
+    pub result: DnsPingResult,
 }
 
 /// One-second delta bookkeeping for `get_live_traffic`. The frontend owns the
@@ -495,6 +520,80 @@ fn classify_dns(adapter_id: &str, static_raw: &str, dhcp_raw: &str) -> DnsConfig
     }
 }
 
+/// Splits an IPv6 resolver list into unique textual addresses.
+fn parse_ipv6_list(raw: &str) -> Vec<String> {
+    let mut servers: Vec<String> = Vec::new();
+    for token in raw.split([' ', ',', ';', '\t', '\r', '\n', '|', '\\']) {
+        if let Ok(ip) = token.trim().parse::<Ipv6Addr>() {
+            if ip.is_unspecified() {
+                continue;
+            }
+            let text = ip.to_string();
+            if !servers.contains(&text) {
+                servers.push(text);
+            }
+        }
+    }
+    servers
+}
+
+/// `::1` means the IPv6 leak guard is on; anything else is the real state.
+fn classify_ipv6_dns(adapter_id: &str, static_raw: &str, dhcp_raw: &str) -> Ipv6DnsState {
+    let static_servers = parse_ipv6_list(static_raw);
+    let guarded = static_servers.iter().any(|server| server == "::1");
+    let (mode, servers) = if guarded {
+        ("guard", static_servers)
+    } else if !static_servers.is_empty() {
+        ("static", static_servers)
+    } else {
+        let dhcp_servers = parse_ipv6_list(dhcp_raw);
+        if dhcp_servers.is_empty() {
+            ("unknown", dhcp_servers)
+        } else {
+            ("dhcp", dhcp_servers)
+        }
+    };
+    Ipv6DnsState {
+        adapter_id: adapter_id.to_string(),
+        guarded,
+        mode: mode.to_string(),
+        servers,
+    }
+}
+
+fn snapshot_from_config(config: &DnsConfig) -> store::DnsRollbackSnapshot {
+    store::DnsRollbackSnapshot {
+        adapter_id: config.adapter_id.clone(),
+        mode: config.mode.clone(),
+        primary: config.primary.clone(),
+        secondary: config.secondary.clone(),
+        captured_at: store::now_ms(),
+    }
+}
+
+/// What a stored snapshot asks Windows to go back to.
+#[derive(Debug, PartialEq)]
+enum RestorePlan {
+    Static {
+        primary: String,
+        secondary: Option<String>,
+    },
+    Dhcp,
+}
+
+fn restore_plan(snapshot: &store::DnsRollbackSnapshot) -> RestorePlan {
+    match (snapshot.mode.as_str(), snapshot.primary.as_deref()) {
+        ("static", Some(primary)) if !primary.is_empty() => RestorePlan::Static {
+            primary: primary.to_string(),
+            secondary: snapshot
+                .secondary
+                .clone()
+                .filter(|secondary| !secondary.is_empty()),
+        },
+        _ => RestorePlan::Dhcp,
+    }
+}
+
 /// Parses `netsh interface ipv4 show dnsservers name=<adapter>` output.
 /// English Windows only; used solely when the registry key is unreadable.
 fn parse_netsh_dns(adapter_id: &str, output: &str) -> Option<DnsConfig> {
@@ -654,8 +753,10 @@ fn set_dns(request: SetDnsRequest) -> Result<DnsConfig, CommandError> {
     let adapter = platform::resolve_adapter(&request.adapter_id)
         .ok_or_else(|| adapter_not_found(&request.adapter_id))?;
 
-    // Rollback reference for the next phase; never returned or logged.
-    let _previous = read_dns_config(&adapter.guid);
+    // Rollback reference: kept in the persisted state so the restore action
+    // survives an app restart.
+    let previous = read_dns_config(&adapter.guid);
+    store::record_snapshot(snapshot_from_config(&previous));
 
     platform::set_dns_primary(&adapter.alias, &request.primary)?;
     if !request.secondary.is_empty() {
@@ -678,6 +779,51 @@ fn reset_dns(adapter_id: String) -> Result<DnsConfig, CommandError> {
     verified_dns(&adapter.guid, |config| config.mode == "dhcp")
 }
 
+/// Restores the resolver Windows had before the last `set_dns`: the static pair
+/// from the snapshot, or DHCP when the adapter was on carrier DNS. Read-back
+/// verified, then the snapshot is cleared so it cannot be replayed.
+#[tauri::command(async)]
+fn restore_previous_dns(adapter_id: String) -> Result<DnsConfig, CommandError> {
+    let snapshot = store::load()
+        .previous_dns_snapshot
+        .ok_or_else(|| CommandError {
+            code: "NO_ROLLBACK".to_string(),
+            message: "No previous DNS snapshot is stored.".to_string(),
+        })?;
+    if !snapshot.adapter_id.eq_ignore_ascii_case(&adapter_id) {
+        return Err(CommandError {
+            code: "NO_ROLLBACK".to_string(),
+            message: format!(
+                "The stored snapshot belongs to another adapter ('{}').",
+                snapshot.adapter_id
+            ),
+        });
+    }
+    let adapter =
+        platform::resolve_adapter(&adapter_id).ok_or_else(|| adapter_not_found(&adapter_id))?;
+
+    let config = match restore_plan(&snapshot) {
+        RestorePlan::Static { primary, secondary } => {
+            platform::set_dns_primary(&adapter.alias, &primary)?;
+            if let Some(secondary) = secondary.as_deref() {
+                platform::add_dns_secondary(&adapter.alias, secondary)?;
+            }
+            platform::flush_dns_cache()?;
+            verified_dns(&adapter.guid, |config| {
+                config.primary.as_deref() == Some(primary.as_str())
+            })?
+        }
+        RestorePlan::Dhcp => {
+            platform::reset_dns_dhcp(&adapter.alias)?;
+            platform::flush_dns_cache()?;
+            verified_dns(&adapter.guid, |config| config.mode == "dhcp")?
+        }
+    };
+
+    store::clear_snapshot();
+    Ok(config)
+}
+
 /// `ipconfig /flushdns` hidden; no elevation needed.
 #[tauri::command(async)]
 fn flush_dns_cache() -> Result<(), CommandError> {
@@ -690,6 +836,35 @@ fn set_ipv6_enabled(adapter_id: String, enabled: bool) -> Result<(), CommandErro
     let adapter =
         platform::resolve_adapter(&adapter_id).ok_or_else(|| adapter_not_found(&adapter_id))?;
     platform::set_ipv6_resolver(&adapter.alias, enabled)
+}
+
+/// True IPv6 resolver state, so the toggle starts from Windows, not local state.
+#[tauri::command(async)]
+fn get_ipv6_dns_state(adapter_id: String) -> Result<Ipv6DnsState, CommandError> {
+    let (static_raw, dhcp_raw) = platform::read_ipv6_dns_values(&adapter_id).unwrap_or_default();
+    Ok(classify_ipv6_dns(&adapter_id, &static_raw, &dhcp_raw))
+}
+
+/// Reads the persisted state file; a missing file yields defaults.
+#[tauri::command(async)]
+fn load_persisted_state() -> Result<store::PersistedAppState, CommandError> {
+    Ok(store::load())
+}
+
+/// Atomically replaces the persisted state file.
+#[tauri::command(async)]
+fn save_persisted_state(state: store::PersistedAppState) -> Result<(), CommandError> {
+    store::save(&state).map_err(|message| CommandError {
+        code: "STATE_WRITE_FAILED".to_string(),
+        message,
+    })
+}
+
+/// Real GitHub raw-JSON pull: HTTPS-only URL guard, hidden `curl` fetch and
+/// manifest validation (array or `{ "servers": [...] }`).
+#[tauri::command(async)]
+fn sync_github_dns_list(url: String) -> Result<Vec<sync::SyncedDnsServer>, CommandError> {
+    sync::fetch(&url)
 }
 
 /// Two real UDP:53 round trips; a single server is fast enough not to need a
@@ -710,18 +885,21 @@ fn ping_dns_server(
 }
 
 /// Bounded parallel sweep (`std::thread::scope`, at most 15 workers) sorted by
-/// reachability then `latency + jitter`.
-#[tauri::command(async)]
-fn benchmark_dns_servers(
-    servers: Vec<DnsBenchmarkTarget>,
-) -> Result<Vec<DnsPingResult>, CommandError> {
+/// reachability then `latency + jitter`. `on_result` runs per finished probe so
+/// the UI can stream progress while the sweep is still running.
+fn benchmark_sweep(
+    servers: &[DnsBenchmarkTarget],
+    on_result: impl Fn(&DnsPingResult, usize) + Sync,
+) -> Vec<DnsPingResult> {
     if servers.is_empty() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
 
+    let total = servers.len();
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let collected: Mutex<Vec<DnsPingResult>> = Mutex::new(Vec::with_capacity(servers.len()));
-    let workers = servers.len().min(BENCHMARK_THREADS);
+    let completed = std::sync::atomic::AtomicUsize::new(0);
+    let collected: Mutex<Vec<DnsPingResult>> = Mutex::new(Vec::with_capacity(total));
+    let workers = total.min(BENCHMARK_THREADS);
 
     std::thread::scope(|scope| {
         for _ in 0..workers {
@@ -735,6 +913,8 @@ fn benchmark_dns_servers(
                     &target.primary,
                     target.secondary.as_deref(),
                 );
+                let done = completed.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                on_result(&result, done);
                 collected
                     .lock()
                     .unwrap_or_else(|poison| poison.into_inner())
@@ -753,7 +933,26 @@ fn benchmark_dns_servers(
                 .unwrap_or(std::cmp::Ordering::Equal),
         )
     });
-    Ok(results)
+    results
+}
+
+#[tauri::command(async)]
+fn benchmark_dns_servers(
+    app: tauri::AppHandle,
+    servers: Vec<DnsBenchmarkTarget>,
+) -> Result<Vec<DnsPingResult>, CommandError> {
+    let total = servers.len();
+    Ok(benchmark_sweep(&servers, |result, completed| {
+        let _ = app.emit(
+            "benchmark:progress",
+            BenchmarkProgressPayload {
+                completed,
+                total,
+                current_server_id: result.server_id.clone(),
+                result: result.clone(),
+            },
+        );
+    }))
 }
 
 /// Resolves all six targets in parallel through the active resolver, rejecting
@@ -794,11 +993,16 @@ pub fn run() {
             get_current_dns,
             set_dns,
             reset_dns,
+            restore_previous_dns,
             flush_dns_cache,
             set_ipv6_enabled,
+            get_ipv6_dns_state,
             ping_dns_server,
             benchmark_dns_servers,
-            run_bypass_probe
+            run_bypass_probe,
+            load_persisted_state,
+            save_persisted_state,
+            sync_github_dns_list
         ])
         .run(tauri::generate_context!())
         .expect("error while running Dns Master");
@@ -996,6 +1200,52 @@ mod tests {
     }
 
     #[test]
+    fn ipv6_guard_is_detected_from_the_static_resolver() {
+        let guard = classify_ipv6_dns("adapter", "::1", "2001:db8::1");
+        assert!(guard.guarded);
+        assert_eq!(guard.mode, "guard");
+        assert_eq!(guard.servers, vec!["::1"]);
+
+        let dhcp = classify_ipv6_dns("adapter", "", "2001:db8::1 2001:db8::2");
+        assert!(!dhcp.guarded);
+        assert_eq!(dhcp.mode, "dhcp");
+        assert_eq!(dhcp.servers.len(), 2);
+
+        let other_static = classify_ipv6_dns("adapter", "2606:4700:4700::1111", "");
+        assert!(!other_static.guarded);
+        assert_eq!(other_static.mode, "static");
+
+        let unknown = classify_ipv6_dns("adapter", "", "0.0.0.0");
+        assert_eq!(unknown.mode, "unknown");
+        assert!(unknown.servers.is_empty());
+    }
+
+    #[test]
+    fn rollback_snapshot_captures_and_restores_the_previous_mode() {
+        let static_config = classify_dns("{GUID}", "1.1.1.1, 1.0.0.1", "");
+        let snapshot = snapshot_from_config(&static_config);
+        assert_eq!(snapshot.adapter_id, "{GUID}");
+        assert_eq!(snapshot.mode, "static");
+        assert_eq!(snapshot.primary.as_deref(), Some("1.1.1.1"));
+        assert_eq!(
+            restore_plan(&snapshot),
+            RestorePlan::Static {
+                primary: "1.1.1.1".into(),
+                secondary: Some("1.0.0.1".into())
+            }
+        );
+
+        let dhcp_config = classify_dns("{GUID}", "", "10.202.10.202");
+        let snapshot = snapshot_from_config(&dhcp_config);
+        assert_eq!(restore_plan(&snapshot), RestorePlan::Dhcp);
+
+        assert_eq!(
+            restore_plan(&store::DnsRollbackSnapshot::default()),
+            RestorePlan::Dhcp
+        );
+    }
+
+    #[test]
     fn sinkhole_addresses_are_rejected() {
         for text in [
             "10.10.34.34",
@@ -1083,7 +1333,7 @@ mod tests {
             .collect();
 
         let started = Instant::now();
-        let results = benchmark_dns_servers(targets).expect("sweep runs");
+        let results = benchmark_sweep(&targets, |_, _| {});
         let elapsed = started.elapsed();
         println!(
             "elapsed {elapsed:?} · {:?}",
