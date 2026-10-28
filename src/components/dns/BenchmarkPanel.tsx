@@ -12,7 +12,7 @@ interface BenchmarkPanelProps {
 }
 
 export function BenchmarkPanel({ scopeIds }: BenchmarkPanelProps) {
-  const { benchmark, runBenchmark, servers } = useApp();
+  const { benchmark, runBenchmark, servers, bridgeReady } = useApp();
 
   const done = benchmark.results.filter((row) => row.status === "done");
   const best = done.reduce<number | null>(
@@ -170,7 +170,9 @@ export function BenchmarkPanel({ scopeIds }: BenchmarkPanelProps) {
 
       <div className="flex items-center justify-between border-t border-white/[0.06] px-3.5 py-2">
         <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-ink-600">top 12 · weighted score</span>
-        <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-ink-600">icmp · simulated</span>
+        <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-ink-600">
+          {bridgeReady ? "udp:53 · live" : "icmp · simulated"}
+        </span>
       </div>
     </aside>
   );

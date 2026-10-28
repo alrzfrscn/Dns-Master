@@ -1,14 +1,17 @@
-//! Read-only Windows network inspection.
+//! Windows network inspection and DNS mutation.
 //!
-//! Everything here is a local Win32 query (`GetAdaptersAddresses`, `GetIfTable2`,
-//! `GetIpForwardTable2`, `RegQueryValueEx`), so nothing flashes a console window
-//! and no elevation is needed. The single subprocess, a hidden `netsh`, only runs
-//! as a DNS fallback when the registry key cannot be read.
+//! Reads are local Win32 queries (`GetAdaptersAddresses`, `GetIfTable2`,
+//! `GetIpForwardTable2`, `RegQueryValueEx`). Writes shell out to hidden `netsh`
+//! and `ipconfig`; when a DNS write is refused for lack of rights, the same
+//! command is retried once through an elevated PowerShell `Start-Process`, so
+//! Windows shows its normal UAC prompt. Every spawned console tool is
+//! `CREATE_NO_WINDOW`.
 
 use std::ffi::OsString;
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::os::windows::ffi::OsStringExt;
 use std::os::windows::process::CommandExt;
+use std::process::{Command, Output};
 use std::ptr::{null, null_mut};
 use std::time::{Duration, Instant};
 
@@ -16,9 +19,9 @@ use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::{ERROR_BUFFER_OVERFLOW, ERROR_SUCCESS};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     FreeMibTable, GetAdaptersAddresses, GetIfTable2, GetIpForwardTable2, GAA_FLAG_INCLUDE_GATEWAYS,
-    IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IF_TYPE_PPP, IF_TYPE_SOFTWARE_LOOPBACK, IF_TYPE_TUNNEL,
-    IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_GATEWAY_ADDRESS_LH, IP_ADAPTER_UNICAST_ADDRESS_LH, MIB_IF_ROW2,
-    MIB_IF_TABLE2, MIB_IPFORWARD_TABLE2,
+    IF_TYPE_ETHERNET_CSMACD, IF_TYPE_IEEE80211, IF_TYPE_PPP, IF_TYPE_SOFTWARE_LOOPBACK,
+    IF_TYPE_TUNNEL, IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_GATEWAY_ADDRESS_LH,
+    IP_ADAPTER_UNICAST_ADDRESS_LH, MIB_IF_ROW2, MIB_IF_TABLE2, MIB_IPFORWARD_TABLE2,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::IfOperStatusUp;
 use windows_sys::Win32::Networking::WinSock::{
@@ -28,11 +31,18 @@ use windows_sys::Win32::System::Registry::{
     RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_LOCAL_MACHINE, KEY_READ,
 };
 
-use crate::NetworkAdapter;
+use crate::{CommandError, NetworkAdapter};
 
 /// `CREATE_NO_WINDOW`, so a spawned console tool never flashes on screen.
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const DNS_PROBE_TIMEOUT: Duration = Duration::from_millis(350);
+
+/// The two values `netsh` needs: the interface alias ("Wi-Fi") and its GUID.
+#[derive(Debug, Clone)]
+pub struct AdapterTarget {
+    pub guid: String,
+    pub alias: String,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Counters {
@@ -88,7 +98,10 @@ pub fn enumerate_adapters() -> Vec<NetworkAdapter> {
         cursor = link.Next;
 
         let name = unsafe { wide_string(link.FriendlyName) };
-        if name.is_empty() || link.IfType == IF_TYPE_SOFTWARE_LOOPBACK || link.OperStatus != IfOperStatusUp {
+        if name.is_empty()
+            || link.IfType == IF_TYPE_SOFTWARE_LOOPBACK
+            || link.OperStatus != IfOperStatusUp
+        {
             continue;
         }
         let Some(ipv4) = (unsafe { first_unicast_ipv4(link.FirstUnicastAddress) }) else {
@@ -176,7 +189,8 @@ pub fn read_counters(adapter_id: &str) -> Option<Counters> {
 /// Raw `NameServer` (static) / `DhcpNameServer` values of the adapter's Tcpip
 /// key. `None` when the key does not exist (unknown or virtual adapter).
 pub fn read_dns_values(adapter_id: &str) -> Option<(String, String)> {
-    let path = format!("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{adapter_id}");
+    let path =
+        format!("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{adapter_id}");
     let key = open_reg_key(&path)?;
     let static_servers = read_reg_string(key, "NameServer").unwrap_or_default();
     let dhcp_servers = read_reg_string(key, "DhcpNameServer").unwrap_or_default();
@@ -187,7 +201,13 @@ pub fn read_dns_values(adapter_id: &str) -> Option<(String, String)> {
 /// Hidden `netsh` read used only when the registry lookup failed.
 pub fn netsh_dns_output(adapter_name: &str) -> Option<String> {
     let output = std::process::Command::new("netsh")
-        .args(["interface", "ipv4", "show", "dnsservers", &format!("name={adapter_name}")])
+        .args([
+            "interface",
+            "ipv4",
+            "show",
+            "dnsservers",
+            &format!("name={adapter_name}"),
+        ])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok()?;
@@ -213,6 +233,225 @@ pub fn probe_latency_ms(target: Ipv4Addr) -> f64 {
     }
 }
 
+/// Resolves the IPC `adapterId` (GUID, GUID without braces, alias or a stale
+/// frontend id) to the alias `netsh` needs and the canonical `{GUID}`.
+pub fn resolve_adapter(adapter_id: &str) -> Option<AdapterTarget> {
+    let wanted = adapter_id.trim().trim_matches(['{', '}']).to_lowercase();
+    if wanted.is_empty() {
+        return None;
+    }
+    if let Some(row) = interface_rows().into_iter().find(|row| {
+        row.guid.trim_matches(['{', '}']).to_lowercase() == wanted
+            || row.alias.to_lowercase() == wanted
+    }) {
+        return Some(AdapterTarget {
+            guid: row.guid,
+            alias: row.alias,
+        });
+    }
+    enumerate_adapters()
+        .into_iter()
+        .find(|adapter| {
+            adapter.id.trim_matches(['{', '}']).to_lowercase() == wanted
+                || adapter.name.to_lowercase() == wanted
+        })
+        .map(|adapter| AdapterTarget {
+            guid: adapter.id,
+            alias: adapter.name,
+        })
+}
+
+fn hidden(program: &str) -> Command {
+    let mut command = Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
+fn output_text(output: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+    .trim()
+    .to_string()
+}
+
+fn elevation_required() -> CommandError {
+    CommandError {
+        code: "ELEVATION_REQUIRED".to_string(),
+        message: "Administrator privileges are required to modify network adapter DNS settings."
+            .to_string(),
+    }
+}
+
+/// UAC declines and localized "access denied" messages all land here.
+fn is_elevation_failure(code: Option<i32>, text: &str) -> bool {
+    let lower = text.to_lowercase();
+    matches!(code, Some(5) | Some(740))
+        || text.trim().is_empty()
+        || [
+            "elevation",
+            "access is denied",
+            "administrator",
+            "permission",
+            "denied",
+            "privilege",
+        ]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+/// Runs `netsh` hidden. A permission failure is retried once through an elevated
+/// PowerShell `Start-Process`, which is what produces the standard UAC prompt.
+pub fn run_netsh(args: &[&str]) -> Result<(), CommandError> {
+    let args: Vec<String> = args.iter().map(|arg| arg.to_string()).collect();
+    let direct = hidden("netsh")
+        .args(&args)
+        .output()
+        .map_err(|error| CommandError {
+            code: "NETSH_SPAWN_FAILED".to_string(),
+            message: format!("Could not start netsh: {error}"),
+        })?;
+
+    if direct.status.success() {
+        return Ok(());
+    }
+
+    let text = output_text(&direct);
+    // A localized netsh prints non-ASCII text for the same permission refusal,
+    // so only a clearly English non-permission error skips the UAC retry.
+    if !is_elevation_failure(direct.status.code(), &text) && text.is_ascii() {
+        return Err(CommandError {
+            code: "NETSH_FAILED".to_string(),
+            message: if text.is_empty() {
+                format!("netsh exited with code {:?}.", direct.status.code())
+            } else {
+                text
+            },
+        });
+    }
+    run_elevated(&args)
+}
+
+fn run_elevated(args: &[String]) -> Result<(), CommandError> {
+    // Start-Process joins ArgumentList with spaces, so args with spaces carry
+    // their own quotes; single quotes are doubled for the PowerShell literal.
+    let line = args
+        .iter()
+        .map(|arg| {
+            if arg.contains(' ') {
+                format!("\"{}\"", arg.replace('"', ""))
+            } else {
+                arg.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let script = format!(
+        "$p = Start-Process -FilePath 'netsh' -ArgumentList '{}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode",
+        line.replace('\'', "''")
+    );
+    let output = hidden("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &script])
+        .output()
+        .map_err(|error| CommandError {
+            code: "ELEVATION_REQUIRED".to_string(),
+            message: format!(
+                "Administrator privileges are required to modify network adapter DNS settings. ({error})"
+            ),
+        })?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(elevation_required())
+    }
+}
+
+pub fn flush_dns_cache() -> Result<(), CommandError> {
+    // Works without elevation.
+    let output = hidden("ipconfig")
+        .arg("/flushdns")
+        .output()
+        .map_err(|error| CommandError {
+            code: "FLUSH_FAILED".to_string(),
+            message: format!("Could not start ipconfig: {error}"),
+        })?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(CommandError {
+            code: "FLUSH_FAILED".to_string(),
+            message: output_text(&output),
+        })
+    }
+}
+
+pub fn set_dns_primary(alias: &str, primary: &str) -> Result<(), CommandError> {
+    run_netsh(&[
+        "interface",
+        "ipv4",
+        "set",
+        "dnsservers",
+        &format!("name={alias}"),
+        "static",
+        primary,
+        "primary",
+        "validate=no",
+    ])
+}
+
+pub fn add_dns_secondary(alias: &str, secondary: &str) -> Result<(), CommandError> {
+    run_netsh(&[
+        "interface",
+        "ipv4",
+        "add",
+        "dnsservers",
+        &format!("name={alias}"),
+        secondary,
+        "index=2",
+        "validate=no",
+    ])
+}
+
+pub fn reset_dns_dhcp(alias: &str) -> Result<(), CommandError> {
+    run_netsh(&[
+        "interface",
+        "ipv4",
+        "set",
+        "dnsservers",
+        &format!("name={alias}"),
+        "source=dhcp",
+    ])
+}
+
+/// Only the IPv6 resolver registration changes; the IPv6 stack stays enabled.
+/// `::1` as the static resolver blocks ISP IPv6 DNS leaks.
+pub fn set_ipv6_resolver(alias: &str, enabled: bool) -> Result<(), CommandError> {
+    if enabled {
+        run_netsh(&[
+            "interface",
+            "ipv6",
+            "set",
+            "dnsservers",
+            &format!("name={alias}"),
+            "source=dhcp",
+        ])
+    } else {
+        run_netsh(&[
+            "interface",
+            "ipv6",
+            "set",
+            "dnsservers",
+            &format!("name={alias}"),
+            "static",
+            "::1",
+            "primary",
+            "validate=no",
+        ])
+    }
+}
+
 /// Default-route lookups, grouped so each `GetIpForwardTable2` copy is freed.
 struct SystemRoute;
 
@@ -222,7 +461,8 @@ impl SystemRoute {
             rows.iter()
                 .filter(|row| row.DestinationPrefix.PrefixLength == 0)
                 .filter(|row| {
-                    sockaddr_inet_ipv4(&row.NextHop).is_some_and(|next_hop| !next_hop.is_unspecified())
+                    sockaddr_inet_ipv4(&row.NextHop)
+                        .is_some_and(|next_hop| !next_hop.is_unspecified())
                 })
                 .min_by_key(|row| row.Metric)
                 .map(|row| row.InterfaceIndex)
@@ -230,7 +470,9 @@ impl SystemRoute {
         .flatten()
     }
 
-    fn with_table<T>(read: impl FnOnce(&[windows_sys::Win32::NetworkManagement::IpHelper::MIB_IPFORWARD_ROW2]) -> T) -> Option<T> {
+    fn with_table<T>(
+        read: impl FnOnce(&[windows_sys::Win32::NetworkManagement::IpHelper::MIB_IPFORWARD_ROW2]) -> T,
+    ) -> Option<T> {
         let mut table: *mut MIB_IPFORWARD_TABLE2 = null_mut();
         if unsafe { GetIpForwardTable2(AF_INET, &mut table) } != ERROR_SUCCESS || table.is_null() {
             return None;
@@ -320,14 +562,24 @@ fn ipv4_of(internet: &SOCKADDR_IN) -> Option<Ipv4Addr> {
         return None;
     }
     // `S_addr` holds the four octets in network order; native bytes keep that order.
-    Some(Ipv4Addr::from(unsafe { internet.sin_addr.S_un.S_addr }.to_ne_bytes()))
+    Some(Ipv4Addr::from(
+        unsafe { internet.sin_addr.S_un.S_addr }.to_ne_bytes(),
+    ))
 }
 
 fn kind_for(if_type: u32, name: &str) -> &'static str {
     let lower = name.to_lowercase();
-    let virtual_private = ["vpn", "wireguard", "wintun", "tap-", "tun", "tailscale", "zerotier"]
-        .iter()
-        .any(|needle| lower.contains(needle));
+    let virtual_private = [
+        "vpn",
+        "wireguard",
+        "wintun",
+        "tap-",
+        "tun",
+        "tailscale",
+        "zerotier",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
     match if_type {
         IF_TYPE_SOFTWARE_LOOPBACK => "loopback",
         IF_TYPE_IEEE80211 => "wifi",
@@ -373,8 +625,13 @@ fn guid_string(guid: &GUID) -> String {
 }
 
 fn wide_array(buffer: &[u16]) -> String {
-    let len = buffer.iter().position(|unit| *unit == 0).unwrap_or(buffer.len());
-    OsString::from_wide(&buffer[..len]).to_string_lossy().into_owned()
+    let len = buffer
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(buffer.len());
+    OsString::from_wide(&buffer[..len])
+        .to_string_lossy()
+        .into_owned()
 }
 
 unsafe fn wide_string(ptr: *const u16) -> String {
@@ -423,7 +680,16 @@ fn read_reg_string(key: HKEY, name: &str) -> Option<String> {
     let name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
     let mut kind = 0u32;
     let mut bytes = 0u32;
-    let status = unsafe { RegQueryValueExW(key, name.as_ptr(), null(), &mut kind, null_mut(), &mut bytes) };
+    let status = unsafe {
+        RegQueryValueExW(
+            key,
+            name.as_ptr(),
+            null(),
+            &mut kind,
+            null_mut(),
+            &mut bytes,
+        )
+    };
     if status != ERROR_SUCCESS || bytes == 0 {
         return None;
     }
@@ -442,5 +708,47 @@ fn read_reg_string(key: HKEY, name: &str) -> Option<String> {
         return None;
     }
     buffer.truncate(bytes as usize / 2);
-    Some(String::from_utf16_lossy(&buffer).trim_end_matches('\0').to_string())
+    Some(
+        String::from_utf16_lossy(&buffer)
+            .trim_end_matches('\0')
+            .to_string(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_permission_failures() {
+        assert!(is_elevation_failure(Some(5), ""));
+        assert!(is_elevation_failure(Some(740), ""));
+        assert!(is_elevation_failure(
+            None,
+            "The requested operation requires elevation (Run as administrator)."
+        ));
+        assert!(is_elevation_failure(Some(1), "Access is denied."));
+        assert!(!is_elevation_failure(
+            Some(1),
+            "The parameter is incorrect."
+        ));
+    }
+
+    #[test]
+    fn resolves_real_adapter_ids_and_aliases() {
+        if let Some(adapter) = enumerate_adapters().first() {
+            let by_id = resolve_adapter(&adapter.id).expect("GUID resolves");
+            assert_eq!(by_id.alias, adapter.name);
+            assert!(!by_id.guid.trim_matches(['{', '}']).is_empty());
+
+            let by_name = resolve_adapter(&adapter.name).expect("alias resolves");
+            assert_eq!(by_name.guid, by_id.guid);
+        }
+    }
+
+    #[test]
+    fn rejects_blank_or_unknown_adapter_ids() {
+        assert!(resolve_adapter("").is_none());
+        assert!(resolve_adapter("no-such-adapter").is_none());
+    }
 }

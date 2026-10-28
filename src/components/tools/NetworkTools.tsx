@@ -50,6 +50,7 @@ export function NetworkTools() {
     activeAdapter,
     applyDns,
     dnsConfig,
+    bridgeReady,
   } = useApp();
 
   const reachable = bypassResults.filter((row) => row.status === "reachable").length;
@@ -138,7 +139,7 @@ export function NetworkTools() {
                 <div className="flex items-center gap-2">
                   <h2 className="font-display text-[13px] font-semibold tracking-wide text-ink-100">Sanction bypass tester</h2>
                   <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-[1px] font-mono text-[7px] uppercase tracking-[0.12em] text-ink-500">
-                    tls probe
+                    udp:53 + tls
                   </span>
                 </div>
                 <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-ink-600">
@@ -285,7 +286,7 @@ export function NetworkTools() {
               <span className="text-ink-600">{bypassResults.length - tested} pending</span>
             </div>
             <span className="flex items-center gap-1 font-mono text-[7px] uppercase tracking-[0.1em] text-ink-600">
-              <Info size={8} /> probe suite lands in phase 3
+              <Info size={8} /> {bridgeReady ? "live dns + tls probes" : "core offline · simulated"}
             </span>
           </div>
         </GlassCard>
@@ -355,7 +356,10 @@ export function NetworkTools() {
 
             <div className="mt-auto rounded-md border border-white/[0.06] bg-black/20 p-2">
               <p className="font-mono text-[7px] uppercase leading-relaxed tracking-[0.1em] text-ink-600">
-                adapter, resolver and throughput reads stream from the rust core · bypass probes land in phase 3
+                adapter, resolver and throughput reads stream from the rust core ·{" "}
+                {bridgeReady
+                  ? "probes resolve through the active resolver with a live tls handshake"
+                  : "bypass probes simulated while the core is offline"}
               </p>
             </div>
           </GlassCard>

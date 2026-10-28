@@ -10,6 +10,7 @@ import {
 } from "react";
 import type {
   AppSettings,
+  BenchmarkResult,
   BenchmarkSession,
   BypassResult,
   ConnectionState,
@@ -23,7 +24,18 @@ import type {
 } from "../types/network";
 import { BYPASS_TARGETS, MOCK_ADAPTERS } from "../data/mock";
 import { DEFAULT_ADAPTER, SEED_SERVERS } from "../data/servers";
-import { fetchCurrentDns, fetchLiveTraffic, fetchNetworkAdapters } from "../lib/tauri";
+import {
+  fetchCurrentDns,
+  fetchLiveTraffic,
+  fetchNetworkAdapters,
+  invokeBenchmarkDnsServers,
+  invokeFlushDns,
+  invokePingDnsServer,
+  invokeResetDns,
+  invokeRunBypassProbe,
+  invokeSetDns,
+  invokeSetIpv6,
+} from "../lib/tauri";
 
 const HISTORY_LENGTH = 48;
 const MAX_TOASTS = 3;
@@ -98,6 +110,18 @@ const AppContext = createContext<AppContextValue | null>(null);
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 const round = (value: number, precision = 1) => Number(value.toFixed(precision));
+
+/** Human-readable Rust `CommandError`, without hiding an elevation refusal. */
+function describeError(error: unknown): string {
+  const candidate = error as Partial<{ code: string; message: string }> | null;
+  if (candidate?.code === "ELEVATION_REQUIRED") {
+    return (
+      candidate.message ??
+      "Administrator privileges are required to modify network adapter DNS settings."
+    );
+  }
+  return candidate?.message ?? "The Windows core rejected the command.";
+}
 
 function buildInitialHistory(): TrafficPoint[] {
   const now = Date.now();
@@ -353,73 +377,150 @@ export function AppProvider({ children }: { children: ReactNode }) {
         error: null,
         adapterId: activeAdapterId,
       }));
-      pushToast(`Applying ${target.name}`, "info", `${target.primary} · ${activeAdapter.name}`);
-      window.setTimeout(() => {
-        if (token !== actionToken.current) return;
-        setActiveDnsId(id);
-        setConnection({
-          phase: "connected",
-          mode: "static",
-          activeDnsId: id,
-          adapterId: activeAdapterId,
-          since: Date.now(),
-          error: null,
-        });
-        setServers((prev) => prev.map((s) => (s.id === id ? { ...s, uptime: clamp(s.uptime + 0.1, 0, 100) } : s)));
-        pushToast(`${target.name} staged`, "success", "Simulated binding · the Windows write lands in Phase 3");
-      }, 1100);
+
+      if (!bridgeReady) {
+        pushToast(`Applying ${target.name}`, "info", `${target.primary} · ${activeAdapter.name}`);
+        window.setTimeout(() => {
+          if (token !== actionToken.current) return;
+          setActiveDnsId(id);
+          setConnection({
+            phase: "connected",
+            mode: "static",
+            activeDnsId: id,
+            adapterId: activeAdapterId,
+            since: Date.now(),
+            error: null,
+          });
+          setServers((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, uptime: clamp(s.uptime + 0.1, 0, 100) } : s)),
+          );
+          pushToast(`${target.name} staged`, "success", "Simulated binding · the Tauri core is offline");
+        }, 1100);
+        return;
+      }
+
+      void (async () => {
+        pushToast(`Applying ${target.name}`, "info", `${target.primary} · ${activeAdapter.name}`);
+        try {
+          const config = await invokeSetDns(activeAdapterId, target.primary, target.secondary);
+          if (token !== actionToken.current) return;
+          setDnsConfig(config);
+          setActiveDnsId(id);
+          setConnection({
+            phase: "connected",
+            mode: config.mode,
+            activeDnsId: id,
+            adapterId: activeAdapterId,
+            since: Date.now(),
+            error: null,
+          });
+          setServers((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, uptime: clamp(s.uptime + 0.1, 0, 100) } : s)),
+          );
+          pushToast(
+            `${target.name} applied`,
+            "success",
+            `Windows resolver · ${config.servers.join(" · ") || target.primary}`,
+          );
+        } catch (error) {
+          if (token !== actionToken.current) return;
+          const message = describeError(error);
+          setConnection((prev) => ({ ...prev, phase: "error", error: message }));
+          pushToast("DNS change failed", "error", message);
+        }
+      })();
     },
-    [servers, activeAdapterId, activeAdapter.name, pushToast],
+    [servers, activeAdapterId, activeAdapter.name, bridgeReady, pushToast],
   );
 
-  const disconnect = useCallback(() => {
-    const token = ++actionToken.current;
-    setConnection((prev) => ({ ...prev, phase: "disconnecting", error: null }));
-    window.setTimeout(() => {
-      if (token !== actionToken.current) return;
-      setActiveDnsId(null);
-      setConnection({
-        phase: "idle",
-        mode: "dhcp",
-        activeDnsId: null,
-        adapterId: activeAdapterId,
-        since: null,
-        error: null,
-      });
-      pushToast("Link released", "info", "Simulated release · the real DHCP reset lands in Phase 3");
-    }, 700);
-  }, [activeAdapterId, pushToast]);
+  const releaseDns = useCallback(
+    (phase: "disconnecting" | "resetting", simulatedDelay: number) => {
+      const token = ++actionToken.current;
+      setConnection((prev) => ({ ...prev, phase, error: null }));
 
-  const resetDhcp = useCallback(() => {
-    const token = ++actionToken.current;
-    setConnection((prev) => ({ ...prev, phase: "resetting", error: null }));
-    window.setTimeout(() => {
-      if (token !== actionToken.current) return;
-      setActiveDnsId(null);
-      setConnection({
-        phase: "idle",
-        mode: "dhcp",
-        activeDnsId: null,
-        adapterId: activeAdapterId,
-        since: null,
-        error: null,
-      });
-      pushToast("DNS reset to DHCP", "success", "Simulated reset · the Windows write lands in Phase 3");
-    }, 850);
-  }, [activeAdapterId, activeAdapter.name, pushToast]);
+      const settle = () => {
+        if (token !== actionToken.current) return;
+        setActiveDnsId(null);
+        setConnection({
+          phase: "idle",
+          mode: "dhcp",
+          activeDnsId: null,
+          adapterId: activeAdapterId,
+          since: null,
+          error: null,
+        });
+      };
+
+      if (!bridgeReady) {
+        window.setTimeout(() => {
+          settle();
+          pushToast(
+            phase === "disconnecting" ? "Link released" : "DNS reset to DHCP",
+            "info",
+            "Simulated · the Tauri core is offline",
+          );
+        }, simulatedDelay);
+        return;
+      }
+
+      void (async () => {
+        try {
+          const config = await invokeResetDns(activeAdapterId);
+          settle();
+          setDnsConfig(config);
+          pushToast(
+            "DNS reset to DHCP",
+            "success",
+            `Windows resolver released · ${config.servers.join(" · ") || "carrier assigned"}`,
+          );
+        } catch (error) {
+          if (token !== actionToken.current) return;
+          const message = describeError(error);
+          setConnection((prev) => ({ ...prev, phase: "error", error: message }));
+          pushToast("Reset failed", "error", message);
+        }
+      })();
+    },
+    [activeAdapterId, bridgeReady, pushToast],
+  );
+
+  const disconnect = useCallback(() => releaseDns("disconnecting", 700), [releaseDns]);
+  const resetDhcp = useCallback(() => releaseDns("resetting", 850), [releaseDns]);
 
   const pingServer = useCallback(
     async (id: string): Promise<number> => {
       const server = servers.find((s) => s.id === id);
       if (!server) return 0;
-      setServers((prev) => prev.map((s) => (s.id === id ? { ...s, latency: null } : s)));
+      setServers((prev) => prev.map((s) => (s.id === id ? { ...s, latency: null, jitter: null } : s)));
+
+      if (bridgeReady) {
+        try {
+          const ping = await invokePingDnsServer(id, server.primary, server.secondary || null);
+          const latency = ping.reachable ? Math.round(ping.latencyMs) : null;
+          setServers((prev) =>
+            prev.map((s) =>
+              s.id === id ? { ...s, latency, jitter: ping.reachable ? ping.jitterMs : null } : s,
+            ),
+          );
+          if (!ping.reachable) {
+            pushToast(`${server.name} unreachable`, "warning", "No answer on UDP:53 or TCP:53");
+          }
+          return latency ?? 0;
+        } catch (error) {
+          pushToast("Ping failed", "error", describeError(error));
+          return 0;
+        }
+      }
+
       await sleep(420 + Math.random() * 520);
       const baseline = server.latency ?? 40;
       const measured = Math.round(clamp(baseline + (Math.random() - 0.45) * 14, 9, 180));
-      setServers((prev) => prev.map((s) => (s.id === id ? { ...s, latency: measured } : s)));
+      setServers((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, latency: measured, jitter: round(Math.random() * 4) } : s)),
+      );
       return measured;
     },
-    [servers],
+    [servers, bridgeReady, pushToast],
   );
 
   const addCustomDns = useCallback(
@@ -488,7 +589,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (benchmarkRunning.current) return;
       const pool = options?.ids?.length
         ? servers.filter((s) => options.ids?.includes(s.id))
-        : (options?.applyBest ? pinnedServers : servers);
+        : options?.applyBest
+          ? pinnedServers
+          : servers;
       if (pool.length === 0) return;
 
       benchmarkRunning.current = true;
@@ -499,70 +602,141 @@ export function AppProvider({ children }: { children: ReactNode }) {
         total: pool.length,
         currentId: pool[0].id,
         startedAt: started,
-        results: pool.map((s) => ({
-          serverId: s.id,
-          name: s.name,
-          category: s.category,
-          latencyMs: null,
-          jitterMs: null,
-          lossPercent: 0,
-          score: 0,
-          status: "pending",
-        })),
+        results: pool.map(
+          (s): BenchmarkResult => ({
+            serverId: s.id,
+            name: s.name,
+            category: s.category,
+            latencyMs: null,
+            jitterMs: null,
+            lossPercent: 0,
+            score: 0,
+            status: "pending",
+          }),
+        ),
       });
 
       let best: { id: string; latency: number } | null = null;
 
-      for (let index = 0; index < pool.length; index += 1) {
-        const server = pool[index];
-        setBenchmark((prev) => ({
-          ...prev,
-          currentId: server.id,
-          results: prev.results.map((r) =>
-            r.serverId === server.id ? { ...r, status: "testing" } : r,
-          ),
-        }));
-        await sleep(170 + Math.random() * 220);
+      try {
+        if (bridgeReady) {
+          // One bounded parallel UDP:53 sweep; the core sorts but the UI owns scores.
+          const pings = await invokeBenchmarkDnsServers(
+            pool.map((s) => ({
+              serverId: s.id,
+              primary: s.primary,
+              secondary: s.secondary || null,
+            })),
+          );
+          const byId = new Map(pings.map((ping) => [ping.serverId, ping]));
 
-        const base = server.latency ?? 45;
-        const latency = Math.round(clamp(base + (Math.random() - 0.4) * 12, 8, 180));
-        const jitter = round(clamp(Math.random() * 9 + 1.2, 0.4, 18));
-        const loss = Math.random() > 0.92 ? round(Math.random() * 1.6, 2) : 0;
-        const score = Math.round(clamp(100 - latency * 0.72 - jitter * 1.6 - loss * 8, 4, 99));
+          const results = pool.map((s): BenchmarkResult => {
+            const ping = byId.get(s.id);
+            const reachable = ping?.reachable === true;
+            const latency = reachable && ping ? Math.round(ping.latencyMs) : null;
+            const jitter = reachable && ping ? round(ping.jitterMs) : null;
+            const loss = ping?.packetLossPercent ?? 100;
+            const score =
+              reachable && latency !== null && jitter !== null
+                ? Math.round(clamp(100 - latency * 0.72 - jitter * 1.6 - loss * 8, 4, 99))
+                : 0;
+            return {
+              serverId: s.id,
+              name: s.name,
+              category: s.category,
+              latencyMs: latency,
+              jitterMs: jitter,
+              lossPercent: loss,
+              score,
+              status: reachable ? "done" : "timeout",
+            };
+          });
 
-        setServers((prev) =>
-          prev.map((s) => (s.id === server.id ? { ...s, latency, uptime: s.uptime } : s)),
-        );
-        setBenchmark((prev) => ({
-          ...prev,
-          progress: Math.round(((index + 1) / pool.length) * 100),
-          results: prev.results.map((r) =>
-            r.serverId === server.id
-              ? { ...r, status: "done", latencyMs: latency, jitterMs: jitter, lossPercent: loss, score }
-              : r,
-          ),
-        }));
-        if (!best || latency < best.latency) best = { id: server.id, latency };
-      }
+          const byServer = new Map(results.map((row) => [row.serverId, row]));
+          setServers((prev) =>
+            prev.map((s) => {
+              const row = byServer.get(s.id);
+              return row ? { ...s, latency: row.latencyMs, jitter: row.jitterMs } : s;
+            }),
+          );
 
-      setBenchmark((prev) => ({
-        ...prev,
-        running: false,
-        currentId: null,
-        progress: 100,
-        results: [...prev.results].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-      }));
-      benchmarkRunning.current = false;
+          for (const row of results) {
+            if (row.latencyMs !== null && (!best || row.latencyMs < best.latency)) {
+              best = { id: row.serverId, latency: row.latencyMs };
+            }
+          }
 
-      const summary = best ? servers.find((s) => s.id === best.id)?.name : undefined;
-      if (options?.applyBest && best) {
-        pushToast("Fastest route locked", "success", `${summary ?? "Resolver"} @ ${best.latency} ms`);
-        applyDns(best.id);
-      } else {
-        pushToast("Benchmark complete", "success", `${pool.length} resolvers probed · best ${best?.latency ?? "—"} ms`);
+          setBenchmark({
+            running: false,
+            progress: 100,
+            total: pool.length,
+            currentId: null,
+            startedAt: started,
+            results: [...results].sort((a, b) => (b.score || 0) - (a.score || 0)),
+          });
+        } else {
+          for (let index = 0; index < pool.length; index += 1) {
+            const server = pool[index];
+            setBenchmark((prev) => ({
+              ...prev,
+              currentId: server.id,
+              results: prev.results.map((r) =>
+                r.serverId === server.id ? { ...r, status: "testing" } : r,
+              ),
+            }));
+            await sleep(170 + Math.random() * 220);
+
+            const base = server.latency ?? 45;
+            const latency = Math.round(clamp(base + (Math.random() - 0.4) * 12, 8, 180));
+            const jitter = round(clamp(Math.random() * 9 + 1.2, 0.4, 18));
+            const loss = Math.random() > 0.92 ? round(Math.random() * 1.6, 2) : 0;
+            const score = Math.round(clamp(100 - latency * 0.72 - jitter * 1.6 - loss * 8, 4, 99));
+
+            setServers((prev) =>
+              prev.map((s) => (s.id === server.id ? { ...s, latency, jitter } : s)),
+            );
+            setBenchmark((prev) => ({
+              ...prev,
+              progress: Math.round(((index + 1) / pool.length) * 100),
+              results: prev.results.map((r) =>
+                r.serverId === server.id
+                  ? { ...r, status: "done", latencyMs: latency, jitterMs: jitter, lossPercent: loss, score }
+                  : r,
+              ),
+            }));
+            if (!best || latency < best.latency) best = { id: server.id, latency };
+          }
+
+          setBenchmark((prev) => ({
+            ...prev,
+            running: false,
+            currentId: null,
+            progress: 100,
+            results: [...prev.results].sort((a, b) => (b.score || 0) - (a.score || 0)),
+          }));
+        }
+
+        const summary = best
+          ? servers.find((s) => s.id === (best as { id: string }).id)?.name
+          : undefined;
+        if (options?.applyBest && best) {
+          pushToast("Fastest route locked", "success", `${summary ?? "Resolver"} @ ${best.latency} ms`);
+          applyDns(best.id);
+        } else {
+          pushToast(
+            "Benchmark complete",
+            "success",
+            `${pool.length} resolvers probed · best ${best?.latency ?? "—"} ms`,
+          );
+        }
+      } catch (error) {
+        pushToast("Benchmark failed", "error", describeError(error));
+        setBenchmark((prev) => ({ ...prev, running: false, currentId: null }));
+      } finally {
+        benchmarkRunning.current = false;
       }
     },
-    [servers, pinnedServers, applyDns, pushToast],
+    [servers, pinnedServers, applyDns, bridgeReady, pushToast],
   );
 
   /* ------------------------------ Utilities ------------------------------ */
@@ -589,30 +763,93 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const toggleIpv6 = useCallback(() => {
-    setIpv6Enabled((prev) => {
-      pushToast(prev ? "IPv6 disabled" : "IPv6 enabled", prev ? "warning" : "success");
-      return !prev;
-    });
-  }, [pushToast]);
+    const next = !ipv6Enabled;
+    if (!bridgeReady) {
+      setIpv6Enabled(next);
+      pushToast(next ? "IPv6 enabled" : "IPv6 disabled", next ? "success" : "warning");
+      return;
+    }
+
+    void (async () => {
+      try {
+        await invokeSetIpv6(activeAdapterId, next);
+        setIpv6Enabled(next);
+        pushToast(
+          next ? "IPv6 resolution enabled" : "IPv6 DNS leak guard on",
+          next ? "success" : "warning",
+          next
+            ? "IPv6 resolvers re-acquired over DHCP"
+            : "IPv6 resolver pinned to ::1 · stack left enabled",
+        );
+      } catch (error) {
+        pushToast("IPv6 change failed", "error", describeError(error));
+      }
+    })();
+  }, [ipv6Enabled, bridgeReady, activeAdapterId, pushToast]);
 
   const flushDns = useCallback(async () => {
     if (flushing) return;
     setFlushing(true);
-    pushToast("Flushing resolver cache", "info", "ipconfig /flushdns · simulated");
-    await sleep(900);
-    setFlushing(false);
-    pushToast("DNS cache cleared", "success", "Simulated flush · real ipconfig flush lands in Phase 3");
-  }, [flushing, pushToast]);
+    try {
+      if (bridgeReady) {
+        pushToast("Flushing resolver cache", "info", "ipconfig /flushdns · Windows core");
+        await invokeFlushDns();
+        const config = await fetchCurrentDns(activeAdapterId);
+        if (config) setDnsConfig(config);
+        pushToast("DNS cache cleared", "success", "Windows resolver cache flushed");
+      } else {
+        pushToast("Flushing resolver cache", "info", "simulated · Tauri core offline");
+        await sleep(900);
+        pushToast("DNS cache cleared", "success", "Simulated flush · needs the Tauri core");
+      }
+    } catch (error) {
+      pushToast("Flush failed", "error", describeError(error));
+    } finally {
+      setFlushing(false);
+    }
+  }, [flushing, bridgeReady, activeAdapterId, pushToast]);
 
   const runBypassTest = useCallback(async () => {
     if (bypassRunning) return;
     setBypassRunning(true);
-    const resolverLabel = activeDns ? activeDns.name : "DHCP";
+    const resolverLabel = dnsConfig?.primary ?? (activeDns ? activeDns.name : "DHCP");
     const bypassFriendly = activeDns?.category === "sanction" || activeDns?.category === "gaming";
     const reachableChance = bypassFriendly ? 0.92 : activeDns ? 0.62 : 0.42;
 
-    setBypassResults(makeBypassRows().map((row) => ({ ...row, status: "testing", resolver: resolverLabel })));
+    setBypassResults(
+      makeBypassRows().map((row) => ({ ...row, status: "testing", resolver: resolverLabel })),
+    );
     pushToast("Sanction bypass probe started", "info", `${BYPASS_TARGETS.length} targets · ${resolverLabel}`);
+
+    if (bridgeReady) {
+      try {
+        const probes = await invokeRunBypassProbe(activeAdapterId, dnsConfig?.primary ?? undefined);
+        setBypassResults(
+          probes.map((probe) => ({
+            targetId: probe.id,
+            status: probe.status,
+            latencyMs: probe.latencyMs > 0 ? Math.round(probe.latencyMs) : null,
+            resolver: probe.resolverUsed,
+            detail: probe.detail,
+          })),
+        );
+        const reachable = probes.filter((probe) => probe.status === "reachable").length;
+        pushToast(
+          "Bypass probe finished",
+          reachable > 0 ? "success" : "warning",
+          `${reachable}/${probes.length} reachable · resolver ${probes[0]?.resolverUsed ?? resolverLabel}`,
+        );
+      } catch (error) {
+        const message = describeError(error);
+        setBypassResults(
+          makeBypassRows().map((row) => ({ ...row, status: "blocked", detail: message })),
+        );
+        pushToast("Bypass probe failed", "error", message);
+      } finally {
+        setBypassRunning(false);
+      }
+      return;
+    }
 
     for (const target of BYPASS_TARGETS) {
       await sleep(420 + Math.random() * 460);
@@ -633,7 +870,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     setBypassRunning(false);
     pushToast("Bypass probe finished", "success", `Resolver under test: ${resolverLabel}`);
-  }, [activeDns, bypassRunning, pushToast]);
+  }, [activeDns, dnsConfig, activeAdapterId, bridgeReady, bypassRunning, pushToast]);
 
   const updateSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));

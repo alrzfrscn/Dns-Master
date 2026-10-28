@@ -42,6 +42,8 @@ export interface DnsServer {
   description?: string;
   /** Last measured latency in ms, null when never probed. */
   latency: number | null;
+  /** Last measured jitter in ms, null when never probed. */
+  jitter?: number | null;
   /** Rolling availability percentage. */
   uptime: number;
   pinned?: boolean;
@@ -145,6 +147,41 @@ export interface DnsConfig {
   servers: string[];
   /** "static" when the adapter has a manually assigned resolver. */
   source: "dhcp" | "static" | "unknown";
+}
+
+/** Real UDP:53 probe measurement returned by `ping_dns_server`. */
+export interface DnsPingResult {
+  serverId: string;
+  latencyMs: number;
+  jitterMs: number;
+  packetLossPercent: number;
+  reachable: boolean;
+}
+
+/** One resolver in a `benchmark_dns_servers` sweep. */
+export interface DnsBenchmarkTarget {
+  serverId: string;
+  primary: string;
+  secondary: string | null;
+}
+
+/** Rust `CommandError` envelope. */
+export interface CommandError {
+  code: string;
+  message: string;
+}
+
+/** One real result from `run_bypass_probe`. */
+export interface BypassProbeResult {
+  id: string;
+  name: string;
+  domain: string;
+  group: string;
+  status: "reachable" | "blocked";
+  latencyMs: number;
+  resolvedIp: string;
+  detail: string;
+  resolverUsed: string;
 }
 
 /** A sanction-bypass reachability probe target (Docker Hub, AI APIs, gaming). */

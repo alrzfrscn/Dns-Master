@@ -434,3 +434,170 @@ Run order matters: the debug binary loads `http://localhost:1420`, so either use
 6. **Persistence**: settings, custom resolvers, pins and session totals currently live in memory; add a JSON/`tauri-plugin-store` store.
 7. **Routing detail**: expose per-adapter routes/metrics instead of a single boolean `isDefault` if multi-homed behavior matters.
 8. **Packaging**: run `npm run tauri build`, verify WebView2 bootstrapping and icons, then decide on signing/elevation.
+
+---
+
+# Dns Master — Phase 3 Completion Report
+
+Date: 2026-10-27
+Scope: real Windows DNS mutations, real UDP:53 benchmark/ping, live sanction bypass prober, frontend wiring, tests
+
+## 17. What became live
+
+| Surface | Phase 2 | Phase 3 |
+| --- | --- | --- |
+| Apply resolver | simulated toast | `set_dns` → hidden `netsh`, UAC fallback, cache flush, read-back verification |
+| Release / Reset | simulated | `reset_dns` → `netsh ... source=dhcp`, flush, verify DHCP |
+| Flush DNS | simulated | `flush_dns_cache` → hidden `ipconfig /flushdns` |
+| IPv6 switch | simulated | `set_ipv6_enabled` → IPv6 resolver to `::1` (guard) or DHCP; stack untouched |
+| Per-row ping | random number | `ping_dns_server` → two real UDP:53 queries, real jitter and loss |
+| Sweep / Find Fastest | timed random | `benchmark_dns_servers` → bounded parallel UDP:53, real numbers |
+| Sanction bypass | random reachable/blocked | `run_bypass_probe` → real DNS resolution + sinkhole check + TLS probe |
+
+The browser fallback is unchanged: when `bridgeReady` is false every action stays simulated and the UI says so.
+
+## 18. Windows mutation layer (`platform.rs`)
+
+- **Adapter resolution** — `resolve_adapter(adapter_id)` accepts a `{GUID}`, a GUID without braces, or the interface alias. It matches `GetIfTable2` rows first, then falls back to `GetAdaptersAddresses`. Commands always write with the canonical **alias** (e.g. `Wi-Fi`) and read back with the canonical **GUID**.
+- **Hidden execution** — one `hidden()` helper sets `CREATE_NO_WINDOW` (`0x08000000`) on every spawned `netsh`, `ipconfig` and `powershell`. The Phase 2 hidden netsh read fallback keeps its flag.
+- **Fast netsh** — never runs `set dnsservers` without `validate=no`, so the UI does not hang for seconds waiting on resolver validation.
+- **Direct first, then UAC** — `run_netsh` executes hidden and unelevated. On failure it retries once through
+  `powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "$p = Start-Process -FilePath 'netsh' -ArgumentList '...' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode"`.
+  A refused/declined prompt becomes `CommandError { code: "ELEVATION_REQUIRED", message: "Administrator privileges are required to modify network adapter DNS settings." }`.
+  Because netsh localizes that refusal, any non-ASCII failure text also takes the UAC path; only a clearly English non-permission error is returned as `NETSH_FAILED` with netsh's own message.
+- **Argument quoting** — the elevated path quotes arguments that contain spaces inside the PowerShell `-ArgumentList`, so aliases such as `Wi-Fi 2` survive both tokenizers.
+
+Commands (all private `fn`, as required by rustc 1.98.1 + tauri-macros 2.7.4):
+
+```rust
+#[tauri::command(async)] fn set_dns(request: SetDnsRequest) -> Result<DnsConfig, CommandError>
+#[tauri::command(async)] fn reset_dns(adapter_id: String) -> Result<DnsConfig, CommandError>
+#[tauri::command(async)] fn flush_dns_cache() -> Result<(), CommandError>
+#[tauri::command(async)] fn set_ipv6_enabled(adapter_id: String, enabled: bool) -> Result<(), CommandError>
+```
+
+`set_dns` validates both IPv4 values (`INVALID_IPV4`), resolves the adapter (`ADAPTER_NOT_FOUND`), snapshots the previous `DnsConfig` for a future rollback action, runs
+`netsh interface ipv4 set dnsservers name=<alias> static <primary> primary validate=no`,
+optionally `netsh interface ipv4 add dnsservers name=<alias> <secondary> index=2 validate=no`, flushes the cache, then polls the registry up to eight times (120 ms apart) and returns the verified config. A mismatch is `VERIFY_FAILED`; success is never reported before the read-back agrees.
+
+`reset_dns` runs `source=dhcp`, flushes, and verifies `mode == "dhcp"`. `set_ipv6_enabled(false)` sets a static `::1` IPv6 resolver (leak guard), `true` restores DHCP; the IPv6 stack is never disabled.
+
+## 19. UDP:53 benchmark engine (`dns.rs`)
+
+Pure `std` networking, shared by the benchmark, the single-server ping and the bypass prober. It is its own module rather than part of the Windows-only `platform.rs`, so the wire format stays unit-tested everywhere.
+
+- **Query builder** — RFC 1035 header + one `IN/A` question for `example.com`; exactly **29 bytes** (12 header + 13 QNAME + 4 type/class), recursion desired, randomized 16-bit transaction id from an atomic counter mixed with the clock (no `rand` dependency).
+- **Transport** — `UdpSocket` bound to `0.0.0.0:0`, **900 ms** read/write timeout. Responses from a different source IP, or with a mismatched transaction id, are ignored inside the remaining deadline. Matching txid + QR bit is required.
+- **Parser** — walks the question with compression-pointer support, then the answer section, and returns the first `A/IN` record. RCODE != 0 (NXDOMAIN/SERVFAIL/REFUSED) yields no address.
+- **TCP fallback** — if UDP times out, a `TcpStream::connect_timeout` to `:53` with **500 ms** measures reachability/RTT; `ConnectionRefused` still counts as an answer, a timeout does not.
+- **`ping_dns_server`** — two back-to-back samples on the primary; if both fail, two on the secondary. Returns the mean latency, `|sample1 − sample2|` jitter, loss of failed attempts (0/50/100) and `reachable` (`INVALID_IPV4` for a bad address).
+- **`benchmark_dns_servers`** — `std::thread::scope` with **at most 15 workers** pulling from an atomic index, so 30 resolvers finish in two waves. Results are sorted `reachable` first, then `latencyMs + jitterMs`. No UI-blocking work on the Tauri event loop (`async` commands).
+
+## 20. Sanction bypass prober
+
+Six targets and groups exactly as specified:
+
+| id | domain | group |
+| --- | --- | --- |
+| docker | registry-1.docker.io | Developer |
+| github | github.com | Developer |
+| openai | api.openai.com | AI services |
+| huggingface | huggingface.co | AI services |
+| steam | store.steampowered.com | Gaming |
+| ea | ea.com | Gaming |
+
+- All six run in parallel with `std::thread::scope`.
+- Resolver selection: optional `resolverIp` from the frontend, else the adapter's configured resolver, else the gateway, else `1.1.1.1`.
+- Each target gets a real UDP:53 `A` query through that resolver. Timeout/failure → `blocked` / "DNS resolution failed / UDP:53 timed out"; no A record → `blocked` / "Resolver returned no A record".
+- Sinkhole/bogon detection covers `10.10.34.34`, `.35`, `.36`, `0.0.0.0`, `127.0.0.1`, the whole loopback range, link-local, multicast and `0.0.0.0/8`. Hits are `blocked` with `"DNS Sinkhole / Filtered (<ip>)"`.
+- A valid public address gets a **2000 ms** TCP connect + TLS ClientHello carrying correct SNI for the domain. A `0x16` handshake record or a `0x15` alert both prove the endpoint answered (not a TCP reset); an EOF/reset is `blocked` with `"TLS blocked (...)"`.
+- Returns typed rows: `id`, `name`, `domain`, `group`, `status`, `latencyMs`, `resolvedIp`, `detail`, `resolverUsed`.
+
+## 21. Frontend wiring
+
+`src/lib/tauri.ts` gained fail-fast wrappers that surface the Rust `CommandError` instead of swallowing it (unlike the read wrappers):
+
+```ts
+invokeSetDns(adapterId, primary, secondary)
+invokeResetDns(adapterId)
+invokeFlushDns()
+invokeSetIpv6(adapterId, enabled)
+invokePingDnsServer(serverId, primary, secondary)
+invokeBenchmarkDnsServers(servers)
+invokeRunBypassProbe(adapterId, resolverIp?)
+```
+
+`src/store/AppStore.tsx`:
+
+- `applyDns` calls `invokeSetDns`, adopts the returned `DnsConfig` for `dnsConfig` + `connection`, and shows the verified resolver list. `ELEVATION_REQUIRED`/other failures become an error-phase connection plus an honest error toast; the stale-token guard still cancels interrupted applies.
+- `disconnect` and `resetDhcp` share `releaseDns`, which calls `invokeResetDns`, then sets DHCP state from the verified config.
+- `flushDns` calls `invokeFlushDns` and re-reads `get_current_dns`.
+- `toggleIpv6` calls `invokeSetIpv6` and only flips local state after success.
+- `pingServer` calls `invokePingDnsServer`, storing real latency + jitter and nulling the row when unreachable.
+- `runBenchmark` sends the whole scope (30 by default, filtered or pinned where requested) to `invokeBenchmarkDnsServers`, maps live results into `BenchmarkResult`, writes real latency/jitter back to the server list, and scores `100 − latency*0.72 − jitter*1.6 − loss*8` clamped to 4–99. `Find Fastest` reuses this and then calls the real `applyDns`.
+- `runBypassTest` calls `invokeRunBypassProbe` and fills the six rows and the three-group matrix from real results. No random outcomes remain in Tauri mode.
+- All simulated branches remain behind `!bridgeReady`.
+
+`NetworkTools.tsx`, `SettingsView.tsx` and `BenchmarkPanel.tsx` now label the live behavior: "udp:53 + tls", "live dns + tls probes", "live system core", "udp:53 · live", Phase 3 channel, and copy explaining the UAC prompt.
+
+## 22. Tests and verification
+
+```text
+cargo test --manifest-path src-tauri/Cargo.toml
+→ 30 passed; 0 failed  (lib)
+→ 0 failed (main, doc-tests)
+
+npx tsc --noEmit
+→ clean (exit 0)
+
+npm run build
+→ tsc --noEmit && vite build
+→ modules transformed (Vite)
+→ built in 11.64s
+→ dist/assets/index-*.js  352.54 kB │ gzip 104.16 kB
+→ dist/assets/charts-*.js 365.26 kB │ gzip 107.42 kB
+```
+
+New coverage:
+- 29-byte query builder, transaction id, QNAME/QTYPE bytes.
+- Synthetic A-record response parsing, txid mismatch rejection, SERVFAIL/truncated rejection.
+- Sinkhole detection for all five specified addresses plus public negatives.
+- ClientHello carries the requested SNI host.
+- `set_dns` rejects bad primary/secondary before touching Windows; unknown adapter → `ADAPTER_NOT_FOUND` (Windows).
+- `ping_dns_server` invalid IPv4 → `INVALID_IPV4`.
+- Adapter resolution by real GUID **and** by alias (Windows, live host).
+- Permission-failure detection for codes 5/740 and English netsh text.
+- Live UDP:53 query with graceful offline handling.
+- Live bypass probe: six typed rows (Windows).
+- Live 15-resolver parallel sweep: sorted reachable-first, bounded time.
+- Live `ipconfig /flushdns` succeeds without elevation.
+
+Live run on this host (real resolver `1.1.1.1`):
+
+- Bypass probe: **6/6 reachable in 1.09 s**; resolved real addresses (e.g. docker `184.197.226.54`, github `140.82.121.3`, openai `162.159.140.245`, huggingface `108.138.51.26`, steam `23.197.162.109`, ea `23.197.160.194`), TLS accepted/alert per endpoint.
+- 15 public resolvers probed in one 15-thread wave: **378 ms cold** (first run, resolver interception warm-up) and **6.9 ms warm**; per-server latency 1.7–2.5 ms, jitter 0.1–2.9 ms, 0% loss. This network transparently intercepts UDP:53, so equal fast numbers are the truthful result, not a bug in the probe.
+- `ipconfig /flushdns` returned success.
+
+## 23. Known limits / intentionally not executed
+
+- **`set_dns`, `reset_dns` and `set_ipv6_enabled` were not executed against the host's live adapter during this run**, because they change the real resolver and require a human to approve UAC. They are covered by validation/adapter tests and by the shared netsh argument construction; the first real run should be done while watching the UAC prompt. Everything else (flush, read-back, UDP ping, sweep, bypass) ran live.
+- `set_dns` verifies the **primary** after write. The secondary is applied but not independently compared.
+- Rollback snapshot is captured but no UI action consumes it yet (Phase 4).
+- The TLS probe reads the first TLS record only; it proves reachability and SNI acceptance, not a completed handshake or certificate validity.
+- Bypass DNS uses UDP only (per spec); a resolver that answers only over TCP:53 is reported as blocked.
+- Sinkhole matching is an explicit list plus obvious bogons; it does not carry a full public-IP geolocation/allowlist database.
+- Benchmark progress cannot stream per-server because it is one batch command; the button shows a running state and jumps to 100%. Per-server event streaming is a Phase 4 improvement.
+- Transparent ISP DNS interception can make any resolver look local and fast; the app reports measured truth rather than correcting for it.
+- The IPv6 toggle starts from local UI state, not a read of the current IPv6 resolver mode.
+- UAC behavior (decline path) was verified by code and unit-tested detection, not by an interactive declined prompt.
+
+## 24. Phase 4 handoff
+
+1. **Rollback** — keep the `set_dns` snapshot in a Tauri state slot and expose one "restore previous resolver" command.
+2. **Progress events** — emit `benchmark:progress` per completed resolver so 30 rows animate instead of one batch jump.
+3. **IPv6 read-back** — add `get_current_ipv6_dns` and seed the toggle from Windows instead of local state.
+4. **Persistence** — settings, custom resolvers, pins, last resolver and traffic totals still reset on restart.
+5. **Adapter hot-plug** — subscribe to `NotifyIpInterfaceChange` instead of refreshing on demand.
+6. **GitHub sync** — the pull is still simulated; implement fetch, schema validation and merge.
+7. **Packaging** — run `npm run tauri build` with WebView2 present; decide whether to ship an elevated manifest or keep per-action UAC.
+8. **Optional TLS fidelity** — add a valid `key_share` so servers reply with a full ServerHello; reachability is already correct without it.

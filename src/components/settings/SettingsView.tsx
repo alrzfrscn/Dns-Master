@@ -69,8 +69,8 @@ export function SettingsView() {
           </div>
 
           <p className="mt-2 text-[9px] leading-relaxed text-ink-500">
-            Interfaces are read from the Windows IP helper API. Resolver writes stay in Phase 3, so this build only
-            observes the selected interface.
+            Interfaces are read from the Windows IP helper API. Resolver writes, cache flushes and IPv6
+            changes run through the same core, with a UAC prompt when Windows requires one.
           </p>
 
           <label className="mt-2.5 block">
@@ -211,12 +211,13 @@ export function SettingsView() {
                   : "border-amber/25 bg-amber/[0.08] text-amber",
               )}
             >
-              {telemetryLive ? "live telemetry" : bridgeReady ? "read-only core" : "browser fallback"}
+              {telemetryLive ? "live telemetry" : bridgeReady ? "live system core" : "browser fallback"}
             </span>
           </div>
 
           <p className="mt-2 text-[9px] leading-relaxed text-ink-500">
-            Adapters, resolver mode and byte counters come from the Windows API. Writes stay disabled until Phase 3.
+            Adapters, resolver mode and byte counters come from the Windows API. DNS writes, cache flushes,
+            IPv6 changes and latency probes run through the same core; elevation is requested only when needed.
           </p>
 
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-white/[0.06] bg-black/20 p-2.5">
@@ -227,6 +228,10 @@ export function SettingsView() {
               "set_dns",
               "reset_dns",
               "flush_dns_cache",
+              "set_ipv6_enabled",
+              "ping_dns_server",
+              "benchmark_dns_servers",
+              "run_bypass_probe",
             ].map((command) => (
               <span key={command} className="truncate font-mono text-[8px] leading-relaxed text-ink-400">
                 {command}()
@@ -236,7 +241,7 @@ export function SettingsView() {
 
           <p className="mt-auto flex items-center gap-1.5 pt-2 font-mono text-[7px] uppercase leading-relaxed tracking-[0.1em] text-ink-600">
             <Info size={8} className="shrink-0" />
-            {stats.live ? "counters streaming from the ip helper api" : "counters idle"} · no dns values are written
+            {stats.live ? "counters streaming from the ip helper api" : "counters idle"} · writes live on the rust core
           </p>
         </GlassCard>
       </div>
@@ -296,7 +301,7 @@ export function SettingsView() {
           <div className="mt-2 space-y-1.5">
             {[
               { label: "App", value: "Dns Master 0.1.0" },
-              { label: "Channel", value: "Phase 2 · live core" },
+              { label: "Channel", value: "Phase 3 · live core" },
               { label: "Frontend", value: "React 19 · Vite 7" },
               { label: "Styling", value: "Tailwind CSS 4" },
               { label: "Backend", value: "Tauri 2 · Win32 API" },
@@ -332,11 +337,11 @@ export function SettingsView() {
         <GlassCard className="p-3">
           <div className="flex items-center gap-2">
             <Info size={11} className="text-ink-500" />
-            <HudLabel>Read-only core</HudLabel>
+            <HudLabel>Live system core</HudLabel>
           </div>
           <p className="mt-1.5 text-[8.5px] leading-relaxed text-ink-500">
-            Adapters, resolver mode and throughput are live Windows reads. DNS writes, cache flushes and bypass
-            probes land in Phase 3 behind the same typed commands.
+            DNS writes, cache flushes, the IPv6 leak guard, UDP:53 benchmarks and TLS bypass probes are live.
+            Windows elevates only the adapter write itself, through a standard UAC prompt.
           </p>
           <div className="mt-2 flex items-center justify-between border-t border-white/[0.05] pt-1.5 font-mono text-[7px] uppercase tracking-[0.08em] text-ink-600">
             <span>ctrl + 1…4 views</span>
