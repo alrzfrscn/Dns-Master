@@ -6,17 +6,17 @@
 
 **A native Windows control deck for DNS resolvers — benchmark, switch, verify, and persist.**
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourusername/dns-master/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/yourusername/dns-master/actions)
-[![Version](https://img.shields.io/github/v/release/yourusername/dns-master?style=for-the-badge&logo=github&logoColor=white&color=00D4AA)](https://github.com/yourusername/dns-master/releases)
-[![License](https://img.shields.io/github/license/yourusername/dns-master?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=5A67D8)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/alrzfrscn/Dns-Master/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/actions)
+[![Version](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=for-the-badge&logo=github&logoColor=white&color=00D4AA)](https://github.com/alrzfrscn/Dns-Master/releases)
+[![License](https://img.shields.io/github/license/alrzfrscn/Dns-Master?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=5A67D8)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
 [![Rust](https://img.shields.io/badge/Rust-1.77%2B-DEA584?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 
-[![Download Latest](https://img.shields.io/badge/Download-Latest%20Release-00D4AA?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yourusername/dns-master/releases/latest)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yourserver)
-[![Stars](https://img.shields.io/github/stars/yourusername/dns-master?style=for-the-badge&logo=github&logoColor=white&color=F0B323)](https://github.com/yourusername/dns-master/stargazers)
+[![Download Latest](https://img.shields.io/badge/Download-Latest%20Release-00D4AA?style=for-the-badge&logo=github&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/releases/latest)
+[![Telegram](https://img.shields.io/badge/Telegram-Contact%20Author-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ImGr8)
+[![Stars](https://img.shields.io/github/stars/alrzfrscn/Dns-Master?style=for-the-badge&logo=github&logoColor=white&color=F0B323)](https://github.com/alrzfrscn/Dns-Master/stargazers)
 
 </div>
 
@@ -40,58 +40,92 @@
 
 ## 🚀 Features
 
-| Feature | Description |
-|---------|-------------|
-| **Live Traffic Telemetry** | Real-time per-adapter byte counters via `GetIfTable2`, streamed at 1Hz with session totals and peaks. No daemon, no console. |
-| **Parallel DNS Benchmark** | RFC 1035 UDP:53 with bounded 15-thread sweep. Per-resolver latency, jitter, packet loss — streamed as probes finish. |
-| **TLS SNI Sanction Bypass Prober** | Resolves 6 real targets (Docker Hub, GitHub, OpenAI, Hugging Face, Steam, EA), rejects sinkholes/bogons, proves port 443 with real ClientHello + correct SNI. |
-| **Locale-Neutral Registry Reader** | Reads `Tcpip\Parameters\Interfaces\{GUID}` directly — no parsing localized `netsh` output. |
-| **UAC-Safe Writer with Rollback** | Applies hidden/unelevated; retries via UAC only when refused. Verifies read-back before success. One-click rollback. |
-| **Persistent State** | Custom resolvers, synced rows, pins, settings, rollback snapshot in `%APPDATA%\com.dnsmaster.desktop\state.json` (atomic writes). |
-| **Real Windows Startup** | Toggle writes/removes `HKCU\...\Run\DnsMaster` with `--minimized` — no window on boot. |
-| **System Tray & Close-to-Tray** | Left-click restores; menu: show/hide, quick engage, DHCP reset, cache flush, quit. |
-| **JSON Import / Export** | Export/import `{ "servers": [...] }` manifests through the same validator sync uses. |
-| **Desktop Notifications** | Native notices for applies, resets, syncs when window is backgrounded. |
-| **GitHub Raw JSON Sync** | HTTPS-only fetch, manifest validation, merge by primary IPv4. Measurements & pins survive pull. |
+### 📡 **Live Traffic Telemetry**
+Real-time per-adapter byte counters via `GetIfTable2`, streamed at 1Hz with session totals and peak tracking. No sampling daemon, no console window.
+
+### ⚡ **Parallel DNS Benchmark**
+RFC 1035 UDP:53 benchmark with bounded 15-thread sweep. Per-resolver latency, jitter, and packet loss — streamed into the table as each probe finishes.
+
+### 🛡️ **TLS SNI Sanction Bypass Prober**
+Resolves 6 real targets (Docker Hub, GitHub, OpenAI, Hugging Face, Steam, EA), rejects sinkholes and bogons, then proves port 443 with a real ClientHello carrying the correct SNI.
+
+### 🔍 **Locale-Neutral Registry Reader**
+Reads `Tcpip\Parameters\Interfaces\{GUID}` directly — no parsing of localized `netsh` output.
+
+### 🛡️ **UAC-Safe Writer with Rollback**
+Applies resolvers hidden and unelevated. Retries through UAC prompt only when Windows refuses. Verifies read-back before reporting success. Keeps previous resolver for one-click rollback.
+
+### 💾 **Persistent State**
+Custom resolvers, GitHub-synced rows, pins, settings, and rollback snapshot live in `%APPDATA%\com.dnsmaster.desktop\state.json`, written atomically.
+
+### 🪟 **Real Windows Startup**
+*Launch with Windows* toggle writes/removes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\DnsMaster`, launching with `--minimized` — no window on boot.
+
+### 📦 **System Tray & Close-to-Tray**
+Left-click restores; menu offers show/hide, quick engage, DHCP reset, cache flush, and real quit. Closing window hides it when *Minimize to tray* is enabled.
+
+### 📤 **JSON Import / Export**
+Export custom and pinned resolvers as `{ "servers": [...] }` manifest. Import any local manifest through the same validator the sync uses.
+
+### 🔔 **Desktop Notifications**
+Native notices for applies, resets, and syncs when the window is in the background.
+
+### 🔄 **GitHub Raw JSON Sync**
+HTTPS-only fetch, manifest validation, merge by primary IPv4. Real measurements and pins survive a pull.
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Main Dashboard | Benchmark Panel | Settings |
+|:---:|:---:|:---:|
+| ![Dashboard](assets/screenshots/dashboard.png) | ![Benchmark](assets/screenshots/benchmark.png) | ![Settings](assets/screenshots/settings.png) |
+| *Real-time traffic & resolver status* | *Parallel latency, jitter & loss* | *Resolver source, sync & preferences* |
+
+| System Tray | Custom DNS Modal | Network Tools |
+|:---:|:---:|:---:|
+| ![Tray](assets/screenshots/tray.png) | ![Custom DNS](assets/screenshots/custom-dns.png) | ![Tools](assets/screenshots/tools.png) |
+| *Quick actions from tray* | *Add/edit custom resolvers* | *Flush cache, reset DHCP, test connectivity* |
+
+</div>
 
 ---
 
 ## 📦 Installation
 
-| Method | Steps |
-|--------|-------|
-| **Installer** (Recommended) | Download `DNS_Master_Setup_x64.exe` from [Releases](https://github.com/yourusername/dns-master/releases/latest) → run (no admin for user-level) |
-| **Portable** | Download `dns-master_x64_portable.zip` from Releases → extract → run `dns-master.exe` |
-| **Package Managers** | `scoop install dns-master` • `choco install dns-master` • `winget install yourusername.dns-master` *(coming soon)* |
+### Option 1: Modern Setup Installer (Recommended)
+1. Go to [Releases](https://github.com/alrzfrscn/Dns-Master/releases/latest)
+2. Download **`Dns.Master_1.0.0_x64-setup.exe`**
+3. Run installer (No admin privileges required for standard user install)
 
----
+### Option 2: Windows Installer (MSI)
+1. Download **`Dns.Master_1.0.0_x64_en-US.msi`** from [Releases](https://github.com/alrzfrscn/Dns-Master/releases/latest)
+2. Ideal for enterprise, silent, or automated deployments
 
-## 🎯 Quick Start
+### Option 3: Package Managers *(Coming Soon)*
+```powershell
+# Winget (coming soon)
+winget install alrzfrscn.dns-master
 
-```mermaid
-flowchart LR
-    A[Launch] --> B[Select Adapter]
-    B --> C[Click Benchmark]
-    C --> D[Review Results]
-    D --> E[Click Apply Best]
-    E --> F[Enjoy Faster DNS!]
-```
-
-1. **Launch** from Start Menu or tray
-2. **Select** active network adapter (top dropdown)
-3. **Benchmark** — click ▶ to test all resolvers
-4. **Review** — sort by latency, jitter, or packet loss
-5. **Apply** — click **Apply** on chosen resolver
-6. **Persist** — enable *Launch with Windows* & *Minimize to tray* in Settings
-
----
-
-## 🌐 Custom Resolver List (GitHub Sync)
-
-Host your own curated list and sync across machines.
-
-### Manifest Format
-```json
+# Scoop (coming soon)
+scoop install dns-master
+🎯 Quick Start
+hub
+Diagram
+Mermaid diagram
+Launch DNS Master from Start Menu or tray
+Select your active network adapter (top dropdown)
+Benchmark — click the ▶ Benchmark button to test all resolvers
+Review — sort by latency, jitter, or packet loss
+Apply — click Apply on your chosen resolver
+Persist — enable Launch with Windows & Minimize to tray in Settings
+🌐 Custom Resolver List on GitHub
+Host your own curated resolver list and sync it across machines.
+Create Your List
+code
+JSON
 {
   "version": 1,
   "servers": [
@@ -105,222 +139,83 @@ Host your own curated list and sync across machines.
       "category": "gaming",
       "tags": ["gaming", "low-ping"],
       "description": "Low-latency gaming resolver"
+    },
+    {
+      "id": "shecan",
+      "name": "Shecan",
+      "nameFa": "شکن",
+      "provider": "Shecan",
+      "primary": "178.22.122.100",
+      "secondary": "185.51.200.2",
+      "category": "sanction",
+      "tags": ["sanction-bypass", "iran"],
+      "description": "Sanction bypass for Iranian users"
     }
   ]
 }
-```
-
-### Fields
-| Field | Required | Type | Description |
-|-------|:--------:|------|-------------|
-| `id` | ✅ | `string` | Unique slug |
-| `name` | ✅ | `string` | Display name |
-| `nameFa` | ❌ | `string` | Persian name |
-| `provider` | ❌ | `string` | Organization |
-| `primary` | ✅ | `IPv4` | Primary DNS (≠ `0.0.0.0`) |
-| `secondary` | ❌ | `IPv4` | Secondary DNS |
-| `category` | ❌ | `enum` | `gaming` \| `sanction` \| `security` \| `general` |
-| `tags` | ❌ | `string[]` | Filterable tags |
-| `description` | ❌ | `string` | Human-readable |
-
-### Validation
-- `name` required, `primary` valid IPv4 ≠ `0.0.0.0`
-- `secondary` empty or valid IPv4
-- `category` normalized to 4 values
-- Duplicate primaries collapse (first wins)
-- **One invalid entry rejects entire manifest**
-
-### Sync Setup
-1. **Export** — Settings → Resolver Source → Export JSON → save as `dns_list.json`
-2. **Commit** — Push to **public** GitHub repo
-3. **Get Raw URL** — e.g., `https://raw.githubusercontent.com/user/repo/main/dns_list.json`
-4. **Paste & Sync** — Settings → Resolver Source → paste URL → **Sync**
-
-> 💡 Pin resolvers before export to preserve across syncs. Pins & measurements survive pull.
-
----
-
-## ⚙️ Configuration
-
-### State File
-```
+Field Reference
+Field	Required	Type	Description
+id	✅	string	Unique identifier (slug)
+name	✅	string	Display name
+nameFa	❌	string	Persian display name
+provider	❌	string	Provider/organization name
+primary	✅	IPv4	Primary DNS server (not 0.0.0.0)
+secondary	❌	IPv4	Secondary DNS server
+category	❌	enum	gaming | sanction | security | general
+tags	❌	string[]	Filterable tags
+description	❌	string	Human-readable description
+Sync Setup
+Export — Settings → Resolver Source → Export JSON → save as dns_list.json
+Commit — Push to a public GitHub repository
+Get Raw URL — e.g., https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json
+Paste & Sync — Settings → Resolver Source → paste URL → click Sync
+💡 Tip: Pin resolvers before export to preserve them across syncs. Pins and real measurements survive a pull.
+⚙️ Configuration
+State File Location
+code
+Code
 %APPDATA%\com.dnsmaster.desktop\state.json
-```
+CLI Arguments
+Argument	Description
+--minimized	Start minimized to tray (used by Windows startup)
+--benchmark	Run benchmark on startup, output JSON to stdout
+--apply <id>	Apply resolver by ID, exit on completion
+--reset-dhcp	Reset adapter to DHCP, exit
+--flush-cache	Flush DNS cache, exit
+🛠️ Development
+Prerequisites
+Windows 10/11 (x64)
+Node.js 20+
+Rust 1.77.2+ with MSVC toolchain (rustup default stable-msvc)
+WebView2 Runtime (Pre-installed on Win 11; installer available for Win 10)
+Setup
+code
+Powershell
+# Clone repository
+git clone https://github.com/alrzfrscn/Dns-Master.git
+cd Dns-Master
 
-### Schema
-```json
-{
-  "customServers": [],
-  "pinnedIds": [],
-  "settings": {
-    "launchOnStartup": false,
-    "minimizeToTray": true,
-    "closeToTray": true,
-    "benchmarkThreads": 15,
-    "benchmarkTimeoutMs": 2000,
-    "resolverSourceUrl": "",
-    "theme": "system"
-  },
-  "rollbackSnapshot": null,
-  "lastSync": null
-}
-```
-
-### CLI Arguments
-| Argument | Description |
-|----------|-------------|
-| `--minimized` | Start minimized to tray (Windows startup) |
-| `--benchmark` | Run benchmark on startup, output JSON |
-| `--apply <id>` | Apply resolver by ID, exit |
-| `--reset-dhcp` | Reset adapter to DHCP, exit |
-| `--flush-cache` | Flush DNS cache, exit |
-
----
-
-## 🛠️ Development
-
-### Prerequisites
-- Windows 10/11 (x64)
-- Node.js 20+ ([fnm](https://github.com/Schniz/fnm) recommended)
-- Rust 1.77.2+ with MSVC toolchain (`rustup default stable-msvc`)
-- WebView2 Runtime (built into Win11; [installer](https://go.microsoft.com/fwlink/p/?LinkId=2124703) for Win10)
-
-### Setup
-```powershell
-git clone https://github.com/yourusername/dns-master.git
-cd dns-master
+# Install dependencies
 npm install
 
-# UI only (simulated data)
-npm run dev          # → http://localhost:1420
-
-# Full native shell
+# Full native development shell
 npm run tauri dev
-
-# Type check
-npx tsc --noEmit
-
-# Rust tests
-cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-### Key Commands
-```powershell
-npm run dev              # Frontend only
-npm run tauri dev        # Full Tauri dev
-npm run tauri:build      # Production build → src-tauri/target/release/bundle/
-npm run lint && npm run format
-cargo check --manifest-path src-tauri/Cargo.toml
-cargo clippy --manifest-path src-tauri/Cargo.toml
-```
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-graph TB
-    subgraph "Frontend (React 19 + TypeScript)"
-        UI[UI Components]
-        Store[Zustand Store]
-        Bridge[Tauri Bridge]
-    end
-    subgraph "Backend (Rust + Tauri 2)"
-        Commands[Tauri Commands]
-        Platform[Windows Platform Layer]
-        DNSEngine[DNS Benchmark Engine]
-        SyncEngine[GitHub Sync Engine]
-        StateStore[State Persistence]
-    end
-    UI --> Store --> Bridge <--> Commands
-    Commands --> Platform & DNSEngine & SyncEngine & StateStore
-    Platform --> WinAPI[Win32 APIs]
-    DNSEngine --> UDP[UDP:53 Raw Sockets] & TLS[TLS ClientHello]
-    SyncEngine --> HTTPS[HTTPS Client]
-    StateStore --> FS[Atomic File Write]
-```
-
-### Technology Stack
-| Layer | Technology | Rationale |
-|-------|------------|-----------|
-| UI Framework | React 19 + TypeScript | Modern, type-safe, excellent DX |
-| Styling | Tailwind CSS 4 + CSS Variables | Utility-first, theming, dark mode |
-| State | Zustand | Minimal, fast, no boilerplate |
-| Native Shell | Tauri 2 | Small bundle, Rust backend, secure |
-| DNS Benchmark | Raw UDP sockets + `tokio` | True RFC 1035, no external deps |
-| TLS Probe | `rustls` + custom ClientHello | Proves SNI without full handshake |
-| Persistence | `serde_json` + atomic write | Crash-safe, human-readable |
-| Sync | `reqwest` + JSON validation | HTTPS-only, fail-fast validation |
-
----
-
-## 🔒 Security & Privacy
-
-- **No telemetry** — zero data collection, no analytics
-- **Local-only** — all data stays on your machine
-- **HTTPS-only sync** — GitHub raw URLs over TLS 1.2+
-- **Manifest validation** — strict schema, rejects malformed lists
-- **UAC-aware** — never elevates silently, always prompts
-- **Open source** — audit the code yourself
-
-### Permissions
-| Permission | Purpose |
-|------------|---------|
-| Network (UDP:53) | DNS benchmark queries |
-| Network (TCP:443) | TLS SNI probes & GitHub sync |
-| Registry (HKCU) | Read/write DNS settings, startup |
-| File System (`%APPDATA%`) | State persistence |
-| System Tray | Background operation |
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! See [Contributing Guide](CONTRIBUTING.md).
-
-### Quick Checklist
-- [ ] Fork → feature branch (`git checkout -b feature/amazing-feature`)
-- [ ] Run `npm run lint && npx tsc --noEmit && cargo clippy`
-- [ ] Conventional commits (`feat:`, `fix:`, `docs:`, etc.)
-- [ ] Push & open PR
-
-### Needed Help
-- 🌍 **Localization** — Persian built-in; add more languages
-- 🎨 **Themes** — More color schemes, high contrast
-- 📊 **Benchmarks** — DoH/DoT support, IPv6
-- 🧪 **Tests** — Integration tests for Windows platform layer
-- 📦 **Packaging** — Scoop, Chocolatey, Winget manifests
-
----
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## 🙏 Acknowledgments
-
-- [Tauri](https://tauri.app) • [React](https://react.dev) • [Rust](https://www.rust-lang.org)
-- [Tailwind CSS](https://tailwindcss.com) • [Zustand](https://github.com/pmndrs/zustand) • [Lucide](https://lucide.dev)
-- All contributors ❤️
-
----
-
-## 📞 Support
-
-| Channel | Purpose |
-|---------|---------|
-| [GitHub Issues](https://github.com/yourusername/dns-master/issues) | Bug reports, feature requests |
-| [Discussions](https://github.com/yourusername/dns-master/discussions) | Questions, ideas, show & tell |
-| [Discord](https://discord.gg/yourserver) | Real-time chat, community |
-
----
-
+🔒 Security & Privacy
+No telemetry — zero data collection, no analytics
+Local-only — all data stays on your machine
+HTTPS-only sync — GitHub raw URLs fetched over TLS 1.2+
+Manifest validation — strict schema, rejects malformed lists
+UAC-aware — never elevates silently, always prompts
+Open source — audit the code yourself
+📄 License
+MIT License — see LICENSE for details.
+📞 Support & Community
+Channel	Purpose
+Telegram (@ImGr8)	Direct chat, feedback & developer contact
+GitHub Issues	Bug reports & feature requests
+GitHub Releases	Download latest executables & updates
 <div align="center">
-
-**Made with ❤️ for Windows users who want control over their DNS**
-
-[⭐ Star this repo](https://github.com/yourusername/dns-master) • [🐛 Report Bug](https://github.com/yourusername/dns-master/issues/new?template=bug_report.md) • [💡 Request Feature](https://github.com/yourusername/dns-master/issues/new?template=feature_request.md)
-
+Made with ❤️ for Windows users who want control over their DNS
+⭐ Star this repo • 🐛 Report Bug • 💡 Request Feature • 💬 Telegram
 </div>
+```
