@@ -6,7 +6,6 @@
 
 **A native Windows control deck for DNS resolvers — benchmark, switch, verify, and persist.**
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/alrzfrscn/Dns-Master/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/actions)
 [![Version](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=for-the-badge&logo=github&logoColor=white&color=00D4AA)](https://github.com/alrzfrscn/Dns-Master/releases)
 [![License](https://img.shields.io/github/license/alrzfrscn/Dns-Master?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=5A67D8)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
@@ -401,8 +400,6 @@ graph TB
 ---
 
 ## 🤝 Contributing
-
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) first.
 
 ### Quick Contribution Checklist
 - [ ] Fork the repo
