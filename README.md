@@ -1,22 +1,6 @@
-<div align="center">
-
-<img src="./assets/banner.png" alt="Dns Master Banner" width="100%" />
-
-<br />
-
 # ⚡ Dns Master
 
-**Next-Generation Windows DNS Changer, RFC 1035 Benchmark Engine & Live Win32 Network Telemetry Deck**
-
-[![English](https://img.shields.io/badge/Language-English-00F0FF?style=for-the-badge)](./README.md)
-[![Persian](https://img.shields.io/badge/زبان-فارسی-A855F7?style=for-the-badge)](./README.fa.md)
-
-[![Release](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=flat-square&logo=github&color=00F0FF)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D6?style=flat-square&logo=windows)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-v2.12-FFC131?style=flat-square&logo=tauri&logoColor=black)](https://v2.tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-windows--sys%20Native-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![React](https://img.shields.io/badge/React-19%20%2B%20TypeScript-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![License](https://img.shields.io/badge/License-MIT-10B981?style=flat-square)](./LICENSE)
+**Next-Generation Windows DNS Changer, RFC 1035 Benchmark Engine & Live Win32 Network Telemetry Deck**<div align="center">
 
 <p align="center">
   <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ Download Latest Installer (.msi / .exe)</strong></a>
@@ -27,6 +11,9 @@
   ·
   <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 Report Bug / Request DNS</strong></a>
 </p>
+
+<br />
+
 
 <img src="./assets/dashboard.png" alt="Dns Master Dashboard" width="100%" />
 
