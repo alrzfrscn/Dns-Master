@@ -26,4 +26,5 @@ npm-debug.log*
 # Agent workspace (screenshots, scratch)
 .openchamber
 tree_structure.txt
+
 AGENT_REPORT.md
