@@ -111,21 +111,37 @@ winget install alrzfrscn.dns-master
 
 # Scoop (coming soon)
 scoop install dns-master
-🎯 Quick Start
-hub
-Diagram
-Mermaid diagram
-Launch DNS Master from Start Menu or tray
-Select your active network adapter (top dropdown)
-Benchmark — click the ▶ Benchmark button to test all resolvers
-Review — sort by latency, jitter, or packet loss
-Apply — click Apply on your chosen resolver
-Persist — enable Launch with Windows & Minimize to tray in Settings
-🌐 Custom Resolver List on GitHub
+```
+
+---
+
+## 🎯 Quick Start
+
+```mermaid
+flowchart LR
+    A[Launch DNS Master] --> B{Select Adapter}
+    B --> C[Click Benchmark]
+    C --> D[Review Results]
+    D --> E[Click Apply Best]
+    E --> F[Enjoy Faster DNS!]
+```
+
+1.  **Launch** DNS Master from Start Menu or tray
+2.  **Select** your active network adapter (top dropdown)
+3.  **Benchmark** — click the ▶ Benchmark button to test all resolvers
+4.  **Review** — sort by latency, jitter, or packet loss
+5.  **Apply** — click **Apply** on your chosen resolver
+6.  **Persist** — enable *Launch with Windows* & *Minimize to tray* in Settings
+
+---
+
+## 🌐 Custom Resolver List on GitHub
+
 Host your own curated resolver list and sync it across machines.
-Create Your List
-code
-JSON
+
+### Create Your List
+
+```json
 {
   "version": 1,
   "servers": [
@@ -153,44 +169,66 @@ JSON
     }
   ]
 }
-Field Reference
-Field	Required	Type	Description
-id	✅	string	Unique identifier (slug)
-name	✅	string	Display name
-nameFa	❌	string	Persian display name
-provider	❌	string	Provider/organization name
-primary	✅	IPv4	Primary DNS server (not 0.0.0.0)
-secondary	❌	IPv4	Secondary DNS server
-category	❌	enum	gaming | sanction | security | general
-tags	❌	string[]	Filterable tags
-description	❌	string	Human-readable description
-Sync Setup
-Export — Settings → Resolver Source → Export JSON → save as dns_list.json
-Commit — Push to a public GitHub repository
-Get Raw URL — e.g., https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json
-Paste & Sync — Settings → Resolver Source → paste URL → click Sync
-💡 Tip: Pin resolvers before export to preserve them across syncs. Pins and real measurements survive a pull.
-⚙️ Configuration
-State File Location
-code
-Code
+```
+
+### Field Reference
+
+| Field         | Required | Type       | Description                                       |
+| ------------- | :------: | ---------- | ------------------------------------------------- |
+| `id`          | ✅        | `string`   | Unique identifier (slug)                          |
+| `name`        | ✅        | `string`   | Display name                                      |
+| `nameFa`      | ❌        | `string`   | Persian display name                              |
+| `provider`    | ❌        | `string`   | Provider/organization name                        |
+| `primary`     | ✅        | `IPv4`     | Primary DNS server (not `0.0.0.0`)                |
+| `secondary`   | ❌        | `IPv4`     | Secondary DNS server                              |
+| `category`    | ❌        | `enum`     | `gaming` \| `sanction` \| `security` \| `general` |
+| `tags`        | ❌        | `string[]` | Filterable tags                                   |
+| `description` | ❌        | `string`   | Human-readable description                        |
+
+### Sync Setup
+
+1.  **Export** — Settings → Resolver Source → Export JSON → save as `dns_list.json`
+2.  **Commit** — Push to a **public** GitHub repository
+3.  **Get Raw URL** — e.g.,
+    `https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json`
+4.  **Paste & Sync** — Settings → Resolver Source → paste URL → click **Sync**
+
+> 💡 **Tip:** Pin resolvers before export to preserve them across syncs. Pins and real measurements survive a pull.
+
+---
+
+## ⚙️ Configuration
+
+### State File Location
+
+```
 %APPDATA%\com.dnsmaster.desktop\state.json
-CLI Arguments
-Argument	Description
---minimized	Start minimized to tray (used by Windows startup)
---benchmark	Run benchmark on startup, output JSON to stdout
---apply <id>	Apply resolver by ID, exit on completion
---reset-dhcp	Reset adapter to DHCP, exit
---flush-cache	Flush DNS cache, exit
-🛠️ Development
-Prerequisites
-Windows 10/11 (x64)
-Node.js 20+
-Rust 1.77.2+ with MSVC toolchain (rustup default stable-msvc)
-WebView2 Runtime (Pre-installed on Win 11; installer available for Win 10)
-Setup
-code
-Powershell
+```
+
+### CLI Arguments
+
+| Argument        | Description                                       |
+| --------------- | ------------------------------------------------- |
+| `--minimized`   | Start minimized to tray (used by Windows startup) |
+| `--benchmark`   | Run benchmark on startup, output JSON to stdout   |
+| `--apply <id>`  | Apply resolver by ID, exit on completion          |
+| `--reset-dhcp`  | Reset adapter to DHCP, exit                       |
+| `--flush-cache` | Flush DNS cache, exit                             |
+
+---
+
+## 🛠️ Development
+
+### Prerequisites
+
+  - Windows 10/11 (x64)
+  - Node.js 20+
+  - Rust 1.77.2+ with MSVC toolchain (`rustup default stable-msvc`)
+  - WebView2 Runtime (Pre-installed on Win 11; [installer](https://go.microsoft.com/fwlink/p/?LinkId=2124703) for Win 10)
+
+### Setup
+
+```powershell
 # Clone repository
 git clone https://github.com/alrzfrscn/Dns-Master.git
 cd Dns-Master
@@ -200,22 +238,41 @@ npm install
 
 # Full native development shell
 npm run tauri dev
-🔒 Security & Privacy
-No telemetry — zero data collection, no analytics
-Local-only — all data stays on your machine
-HTTPS-only sync — GitHub raw URLs fetched over TLS 1.2+
-Manifest validation — strict schema, rejects malformed lists
-UAC-aware — never elevates silently, always prompts
-Open source — audit the code yourself
-📄 License
-MIT License — see LICENSE for details.
-📞 Support & Community
-Channel	Purpose
-Telegram (@ImGr8)	Direct chat, feedback & developer contact
-GitHub Issues	Bug reports & feature requests
-GitHub Releases	Download latest executables & updates
-<div align="center">
-Made with ❤️ for Windows users who want control over their DNS
-⭐ Star this repo • 🐛 Report Bug • 💡 Request Feature • 💬 Telegram
-</div>
 ```
+
+---
+
+## 🔒 Security & Privacy
+
+  - **No telemetry** — zero data collection, no analytics
+  - **Local-only** — all data stays on your machine
+  - **HTTPS-only sync** — GitHub raw URLs fetched over TLS 1.2+
+  - **Manifest validation** — strict schema, rejects malformed lists
+  - **UAC-aware** — never elevates silently, always prompts
+  - **Open source** — audit the code yourself
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## 📞 Support & Community
+
+| Channel                                                             | Purpose                                   |
+| ------------------------------------------------------------------- | ----------------------------------------- |
+| [Telegram (@ImGr8)](https://t.me/ImGr8)                             | Direct chat, feedback & developer contact |
+| [GitHub Issues](https://github.com/alrzfrscn/Dns-Master/issues)     | Bug reports & feature requests            |
+| [GitHub Releases](https://github.com/alrzfrscn/Dns-Master/releases) | Download latest executables & updates     |
+
+---
+
+<div align="center">
+
+**Made with ❤️ for Windows users who want control over their DNS**
+
+[⭐ Star this repo](https://github.com/alrzfrscn/Dns-Master) • [🐛 Report Bug](https://github.com/alrzfrscn/Dns-Master/issues/new?template=bug_report.md) • [💡 Request Feature](https://github.com/alrzfrscn/Dns-Master/issues/new?template=feature_request.md) • [💬 Telegram](https://t.me/ImGr8)
+
+</div>
