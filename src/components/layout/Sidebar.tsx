@@ -13,18 +13,12 @@ const NAV: { id: ViewId; label: string; hint: string; icon: typeof Gauge; index:
 
 function BrandMark() {
   return (
-    <svg viewBox="0 0 40 40" className="h-9 w-9" aria-hidden="true">
-      <defs>
-        <linearGradient id="brand-ring" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#00F0FF" />
-          <stop offset="1" stopColor="#A855F7" />
-        </linearGradient>
-      </defs>
-      <circle cx="20" cy="20" r="18" fill="none" stroke="url(#brand-ring)" strokeWidth="1.4" strokeDasharray="78 36" />
-      <circle cx="20" cy="20" r="13" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
-      <path d="M22.4 7.6 12.8 21.4h6.1L16.6 32.4 27.6 17.6h-6.2z" fill="#00F0FF" opacity="0.92" />
-      <circle cx="31.6" cy="9.4" r="1.6" fill="#A855F7" />
-    </svg>
+    <img
+      src="/app-icon.png"
+      alt="Dns Master"
+      className="h-9 w-9 rounded-xl object-cover ring-1 ring-neon/30 shadow-[0_0_18px_rgba(0,240,255,0.22)]"
+      draggable={false}
+    />
   );
 }
 

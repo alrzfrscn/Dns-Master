@@ -43,8 +43,11 @@ export function PingRadarWidget() {
               <path d="M26 26l88 88M114 26l-88 88" opacity="0.4" strokeDasharray="2 6" />
             </g>
 
-            {/* sweep wedge */}
-            <g className="origin-center animate-sweep" style={{ transformBox: "fill-box", animationDuration: "5.4s" }}>
+            {/* sweep wedge — view-box origin keeps the apex on the centre dot */}
+            <g
+              className="origin-center animate-sweep"
+              style={{ transformBox: "view-box", transformOrigin: "70px 70px", animationDuration: "5.4s" }}
+            >
               <path d="M70 70 L70 10 A60 60 0 0 1 120 52 Z" fill="url(#radar-sweep)" opacity="0.55" />
             </g>
             <defs>

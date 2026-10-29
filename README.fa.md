@@ -1,33 +1,23 @@
 <div dir="rtl" align="right">
 
-<div align="center">
+# ⚡ Dns Master
 
-<img src="./assets/banner.png" alt="بنر Dns Master" width="100%" />
-
-<br />
-
-# ⚡ Dns Master (دی‌ان‌اس مستر)
-
-**پیشرفته‌ترین ابزار تغییر DNS، بنچمارک واقعی پورت ۵۳، تستر تحریم‌شکن و مانیتورینگ زنده ترافیک شبکه برای ویندوز ۱۰ و ۱۱**
-
-[![English](https://img.shields.io/badge/Language-English-00F0FF?style=for-the-badge)](./README.md)
-[![Persian](https://img.shields.io/badge/زبان-فارسی-A855F7?style=for-the-badge)](./README.fa.md)
-
-[![Release](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=flat-square&logo=github&color=00F0FF)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D6?style=flat-square&logo=windows)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-v2.12-FFC131?style=flat-square&logo=tauri&logoColor=black)](https://v2.tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-windows--sys%20Native-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-[![React](https://img.shields.io/badge/React-19%20%2B%20TypeScript-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+**ابزار نسل جدید تغییر DNS ویندوز، موتور بنچمارک RFC 1035 و داشبورد مانیتورینگ زنده شبکه با Win32**<div align="center">
 
 <p align="center">
-  <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ دانلود مستقیم نسخه نصبی ویندوز (.exe / .msi)</strong></a>
+  <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ دانلود جدیدترین نسخه نصبی</strong></a>
   ·
   <a href="./README.md"><strong>🇬🇧 English Documentation</strong></a>
   ·
   <a href="./docs/ARCHITECTURE.md"><strong>📐 معماری فنی سیستم</strong></a>
   ·
-  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 گزارش باگ یا پیشنهاد DNS</strong></a>
+  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 گزارش باگ</strong></a>
+  ·
+  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>➕ پیشنهاد DNS</strong></a>
 </p>
+
+<br />
+
 
 <img src="./assets/dashboard.png" alt="محیط برنامه Dns Master" width="100%" />
 
@@ -37,84 +27,99 @@
 
 ## 🎯 چرا Dns Master؟
 
-اکثر برنامه‌های تغییر DNS در ویندوز یا ظاهری قدیمی دارند، یا هنگام تغییر DNS پنجره سیاه `CMD` را روی صفحه می‌پرانند، و یا برای تست سرعت از پینگ معمولی (`ICMP`) استفاده می‌کنند که توسط بسیاری از سرورها مسدود شده و سرعت واقعی باز شدن سایت‌ها و بازی‌ها را نشان نمی‌دهد.
+اکثر ابزارهای تغییر DNS در ویندوز به رابط‌های کاربری قدیمی وابسته‌اند، پنجره‌های قابل‌مشاهده `cmd.exe` باز می‌کنند یا برای سنجش سرعت از پینگ ساده ICMP استفاده می‌کنند که بسیاری از ارائه‌دهندگان DNS آن را مسدود می‌کنند یا در شبکه‌های Anycast نتیجه نادرست می‌دهد. **Dns Master** از پایه با **Rust (`windows-sys`)** و **React 19** ساخته شده تا یک داشبورد کنترل شبکه سبک، دقیق و در شأن گیمینگ ارائه کند.
 
-**Dns Master** با ترکیب هسته فوق‌سریع **Rust (متصل به Win32 API ویندوز)** و رابط کاربری **React 19 + Tailwind CSS** با تم تاریک شیشه‌ای/نئونی ساخته شده است تا تمام ابزارهای شبکه را بدون مصرف CPU در یک داشبورد مدرن جمع کند.
-
-| ویژگی | ابزارهای قدیمی تغییر DNS | ⚡ Dns Master (`v1.0.0`) |
+| قابلیت | ابزارهای قدیمی DNS | ⚡ Dns Master (`v1.0.0`) |
 | :--- | :--- | :--- |
-| **روش تست پینگ و سرعت** | پینگ ساده `ICMP` (اغلب مسدود یا غیرواقعی در شبکه‌های Anycast) | **ارسال کوئری واقعی DNS روی پورت `UDP:53`** (استاندارد RFC 1035) + محاسبه دقیق Jitter |
-| **تست هوشمند تحریم‌شکن** | ندارد | **تستر زنده TLS/SNI روی پورت 443** + تشخیص آی‌پی‌های فیلترینگ (`10.10.34.x`) |
-| **مانیتورینگ زنده ترافیک** | ندارد یا نیازمند پردازش سنگین | **ارتباط مستقیم با هسته ویندوز (`GetIfTable2`)** با مصرف نزدیک به صفر CPU |
-| **تغییر و خواندن ایمن DNS** | اجرای کورکورانه `netsh` همراه با پرش پنجره CMD | **خواندن مستقیم از رجیستری ویندوز**، اجرای کاملاً مخفی، تایید ثبت شدن و **دکمه بازگشت (Rollback)** |
-| **به‌روزرسانی لیست سرورها** | دستی و ثابت | **آپدیت آنلاین ۱-کلیکی از گیت‌هاب** + قابلیت Import/Export فایل JSON |
+| **سنجش تأخیر** | پینگ ساده ICMP (اغلب مسدود یا نادقیق) | **کوئری واقعی DNS روی UDP:53** طبق RFC 1035 + پشتیبان TCP:53 و محاسبه Jitter |
+| **بررسی تحریم و فیلترینگ** | ندارد | **تستر زنده TLS/SNI** + تشخیص Sinkhole ارائه‌دهنده اینترنت (`10.10.34.x`) |
+| **مانیتورینگ زنده پهنای باند** | ندارد یا نظرسنجی سنگین CPU | **`GetIfTable2` ویندوز با مصرف تقریباً صفر CPU** و جریان زنده دانلود/آپلود هر ثانیه |
+| **خواندن و نوشتن ایمن DNS** | اجرای کورکورانه `netsh` همراه با پرش پنجره CMD | **خواندن مستقل از زبان از رجیستری**، اجرای مخفی با `CREATE_NO_WINDOW`، تأیید بازخوانی و **بازگردانی یک‌کلیکی** |
+| **به‌روزرسانی لیست رزولورها** | سخت‌کدشده / ویرایش دستی `.ini` | **همگام‌سازی یک‌کلیکی JSON از GitHub** + ورود/خروج JSON محلی |
 
 ---
 
-## ✨ امکانات و قابلیت‌های کلیدی
+## ✨ امکانات اصلی
 
-- 🔮 **رابط کاربری گیمینگ و شیشه‌ای (Dark Glassmorphism HUD):** پنجره بدون قاب `1100×720` با نمودار لحظه‌ای سرعت دانلود/آپلود، رادار پینگ و میانبرهای کیبورد (`Ctrl+1` تا `Ctrl+4`).
-- 🇮🇷 **مجهز به ۳۰ سرور منتخب ایرانی و جهانی:** شامل بهترین دی‌ان‌اس‌های گیمینگ و تحریم‌شکن (**الکترو، رادار گیم، شکن، ۴۰۳، بگذر، شاتل، شلتر، وانیلا، دایناکس، هاست‌ایران، کلودفلر، گوگل، Quad9، AdGuard و...**).
-- 🚀 **بنچمارک موازی و دکمه «یافتن سریع‌ترین» (Find Fastest):** تست همزمان تمام ۳۰ سرور در کمتر از ۲ ثانیه با نمایش زنده پیشرفت هر سرور و اتصال خودکار به بهترین گزینه بر اساس پینگ و جیتر.
-- 🛡️ **آزمایشگاه تست تحریم‌شکن (Sanction Bypass Tester):** بررسی واقعی باز شدن ۶ سرویس حیاتی برنامه‌نویسی، هوش مصنوعی و گیمینگ (**Docker Hub, GitHub, OpenAI API, Hugging Face, Steam, EA Online**) با DNS فعلی شما.
-- 🔌 **تشخیص هوشمند کارت شبکه اصلی:** شناسایی دقیق کارت شبکه فعال دارای اینترنت (`Wi-Fi`، `Ethernet` و کارت‌های مجازی VPN) و نمایش سرعت لینک، آی‌پی محلی و Gateway.
-- 🔒 **محافظ نشت IPv6 (IPv6 Leak Guard):** جلوگیری از لو رفتن DNS واقعی روی اینترنت‌های دارای IPv6 بدون از کار انداختن پشته شبکه ویندوز.
-- 🖥️ **مینی‌مایز در کنار ساعت ویندوز (System Tray) و اجرای خودکار:** تغییر سریع DNS، ریست به DHCP و خالی کردن کش (`Flush DNS`) تنها با کلیک راست روی آیکون کنار ساعت ویندوز.
-
----
-
-## 📥 دانلود و نصب (ویندوز ۱۰ و ۱۱ نسخه ۶۴ بیتی)
-
-۱. وارد بخش [**Releases در گیت‌هاب**](https://github.com/alrzfrscn/Dns-Master/releases) شوید.
-۲. فایل نصبی **`Dns.Master_1.0.0_x64-setup.exe`** یا **`Dns.Master_1.0.0_x64_en-US.msi`** را دانلود و نصب کنید.
-> **نکته درباره دسترسی Administrator:** برنامه برای نمایش ترافیک، تست پینگ، بنچمارک و حتی `Flush DNS` نیازی به دسترسی ادمین ندارد و فقط در لحظه‌ای که دکمه تغییر DNS روی کارت شبکه را می‌زنید، مجوز استاندارد ویندوز (UAC) را درخواست می‌کند.
+- 🔮 **رابط کاربری شیشه‌ای Obsidian (`1100×720`)** — محیط تاریک بدون قاب با تلمتری زنده Recharts، رادار مسیر و میانبرهای کیبورد (`Ctrl+1…4`).
+- 🚀 **موتور بنچمارک موازی UDP:53** — جاروب هم‌زمان بیش از ۳۰ رزولور جهانی و ایرانی با تعداد محدودی worker thread در کمتر از ۲ ثانیه، همراه با پیشرفت زنده هر سرور.
+- 🛡️ **ماتریس عبور از تحریم** — آزمایش واقعی resolve شدن DNS و دسترسی TLS SNI روی پورت `443` برای **Docker Hub، GitHub، OpenAI API، Hugging Face، Steam Store و EA Online**.
+- 🔌 **تشخیص هوشمند چند آداپتور** — شمارش رابط‌های فیزیکی (`Wi-Fi`، `Ethernet`) و مجازی/VPN با `GetAdaptersAddresses` و `GetIpForwardTable2` و برجسته‌سازی خودکار مسیر پیش‌فرض فعال.
+- 🔒 **محافظ نشت IPv6** — جلوگیری از نشت DNS اینترنت‌سرویس‌دهنده با اتصال رزولور IPv6 رابط به loopback (`::1`) بدون غیرفعال کردن پشته IPv6 ویندوز.
+- ⏪ **بازگردانی تراکنشی DNS** — پیش از اعمال DNS جدید، تنظیمات قبلی آداپتور به‌صورت خودکار ذخیره می‌شود تا با یک کلیک قابل بازیابی باشد.
+- 🖥️ **سینی سیستم و اجرای خودکار بی‌صدا** — کوچک شدن تمیز به سینی ویندوز برای جابه‌جایی فوری (`Engage Electro`، `Reset DHCP`، `Flush DNS`) و پشتیبانی از اجرا در زمان بوت از طریق `HKCU\...\Run` با سوییچ `--minimized`.
 
 ---
 
-## 🌐 آپدیت آنلاین لیست DNS و مشارکت در پروژه (`dns_list.json`)
+## 📥 نصب (ویندوز ۱۰ / ۱۱)
 
-شما می‌توانید در بخش **Settings → Resolver Source** یا با زدن دکمه **Sync** در بخش **DNS Vault**، آخرین لیست سرورهای DNS را به صورت آنلاین از گیت‌هاب دریافت کنید:
+1. به [**صفحه Releases**](https://github.com/alrzfrscn/Dns-Master/releases) بروید.
+2. جدیدترین فایل **`Dns.Master_1.0.0_x64-setup.exe`** یا **`Dns.Master_1.0.0_x64_en-US.msi`** را دانلود کنید.
+3. نصب‌کننده را اجرا کرده و **Dns Master** را باز کنید.
+   > **نکته درباره ارتقای UAC:** خواندن تلمتری، بنچمارک UDP:53 و پاک‌کردن کش DNS به **هیچ** دسترسی ادمینی نیاز ندارد. مجوز UAC ویندوز *فقط* هنگام نوشتن DNS جدید روی آداپتور شبکه درخواست می‌شود.
 
-</div>
+---
 
+## 🌐 لیست جامعه DNS و همگام‌سازی GitHub (`dns_list.json`)
+
+**Dns Master** می‌تواند سرورهای DNS به‌روز را مستقیماً از GitHub و از مسیر **Settings → Resolver Source** (یا دکمه **Sync** در **DNS Vault**) دریافت کند.
+
+آدرس پیش‌فرض مانیفست جامعه:
 ```text
 https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json
 ```
 
-<div dir="rtl" align="right">
+### 🤝 افزودن DNS جدید (Pull Request)
+DNS سریع برای گیمینگ یا عبور از تحریم می‌شناسید؟ آن را به [`dns_list.json`](./dns_list.json) اضافه کنید و یک Pull Request باز کنید! پس از ادغام، همه کاربران Dns Master بلافاصله با دکمه **Sync** آن را دریافت می‌کنند.
 
-### 🤝 چطور DNS جدید به لیست عمومی اضافه کنیم؟ (Pull Request)
-اگر DNS جدید و پرسرعتی برای بازی یا دور زدن تحریم‌ها می‌شناسید، کافی است فایل [`dns_list.json`](./dns_list.json) را در همین ریپازیتوری ویرایش کرده و یک **Pull Request** ثبت کنید تا پس از تایید، با یک کلیک برای تمام کاربران برنامه همگام‌سازی شود! همچنین می‌توانید داخل برنامه DNSهای شخصی خودتان را با دکمه **Export JSON** خروجی بگیرید.
+```json
+{
+  "version": 1,
+  "servers": [
+    {
+      "id": "electro",
+      "name": "Electro",
+      "provider": "Electro Team · الکترو",
+      "primary": "78.157.42.100",
+      "secondary": "78.157.42.101",
+      "category": "gaming",
+      "location": "IR · Tehran",
+      "tags": ["gaming", "bypass", "iran"]
+    }
+  ]
+}
+```
+*دسته‌بندی‌های پشتیبانی‌شده:* `"gaming"` | `"sanction"` | `"security"` | `"general"`
 
 ---
 
-## 🛠️ ساخت و اجرا از روی سورس‌کد (ویژه توسعه‌دهندگان)
+## 🛠️ پشته فناوری و توسعه
 
-برای اجرای پروژه در محیط توسعه، به **Node.js** و **Rust Toolchain** روی ویندوز نیاز دارید:
+- **فرانت‌اند:** React 19، TypeScript، Vite 7، Tailwind CSS 4، Recharts، آیکون‌های Lucide و فونت‌های میزبانی‌شده محلی `@fontsource` (`Oxanium`، `Sora`، `JetBrains Mono`).
+- **بک‌اند (`src-tauri`):** Rust، Tauri v2، فراخوانی مستقیم Win32 API از طریق `windows-sys` (`IpHelper`، `Ndis`، `WinSock`، `Registry`)، پارسر DNS خالص `std` طبق RFC 1035 و تستر SNI با ClientHello TLS.
+- **بررسی عمیق معماری:** برای قراردادهای کامل IPC و جزئیات داخلی، [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) را بخوانید.
 
-</div>
+### ساخت از سورس
 
 ```powershell
-# ۱. نصب وابستگی‌های فرانت‌اند
+# 1. Install frontend dependencies
 npm install
 
-# ۲. اجرای برنامه در حالت توسعه (محیط زنده دسکتاپ)
+# 2. Run in development mode (Vite + Tauri native window)
 npm run tauri dev
 
-# ۳. اجرای ۴۶ تست واحد Rust و بررسی تایپ‌اسکریپت
+# 3. Run Rust unit tests (46 tests) & frontend type-check
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run build
 
-# ۴. ساخت فایل‌های نصبی نهایی (.exe و .msi)
+# 4. Build production Windows installers (.exe & .msi)
 npm run tauri build
 ```
-
-<div dir="rtl" align="right">
 
 ---
 
 ## ⭐ حمایت از پروژه
 
-اگر **Dns Master** برای کاهش پینگ بازی یا رفع تحریم ابزارهای برنامه‌نویسی به کارتان آمد، خوشحال می‌شویم با دادن یک **ستاره (Star ⭐)** در بالای همین صفحه از پروژه حمایت کنید و آن را به دوستانتان معرفی کنید!
+اگر **Dns Master** به کاهش پینگ شما کمک کرد یا موانع توسعه را دور زد، لطفاً به این مخزن **ستاره ⭐** بدهید و آن را با دوستانتان به اشتراک بگذارید!
 
 </div>
