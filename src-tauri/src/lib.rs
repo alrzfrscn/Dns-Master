@@ -6,12 +6,14 @@
 //! camelCase over the IPC boundary.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
+mod autostart;
 mod dns;
 mod store;
 mod sync;
@@ -867,6 +869,43 @@ fn sync_github_dns_list(url: String) -> Result<Vec<sync::SyncedDnsServer>, Comma
     sync::fetch(&url)
 }
 
+/// True Windows startup state (`HKCU\...\Run` value `DnsMaster`).
+#[tauri::command(async)]
+fn get_autostart_enabled() -> Result<bool, CommandError> {
+    Ok(autostart::is_enabled())
+}
+
+/// Writes or removes the startup value and returns the verified state.
+#[tauri::command(async)]
+fn set_autostart_enabled(enabled: bool) -> Result<bool, CommandError> {
+    autostart::set_enabled(enabled)
+}
+
+/// Close button: hide to the tray when it is on and the tray exists, else exit.
+#[tauri::command]
+fn handle_window_close(window: tauri::Window, minimize_to_tray: bool) -> Result<(), CommandError> {
+    if minimize_to_tray && tray_ready() {
+        return window.hide().map_err(|error| CommandError {
+            code: "WINDOW_HIDE_FAILED".to_string(),
+            message: format!("Could not hide the window: {error}"),
+        });
+    }
+    window.app_handle().exit(0);
+    Ok(())
+}
+
+/// Always exits the process, even when minimize-to-tray is enabled.
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+/// Local `.json` import: the same validator the GitHub sync uses.
+#[tauri::command(async)]
+fn import_dns_manifest(json: String) -> Result<Vec<sync::SyncedDnsServer>, CommandError> {
+    sync::parse_manifest(&json)
+}
+
 /// Two real UDP:53 round trips; a single server is fast enough not to need a
 /// thread of its own, so it stays on the async blocking pool.
 #[tauri::command(async)]
@@ -983,10 +1022,122 @@ fn run_bypass_probe(
     Ok(results)
 }
 
+/// Set only after the tray icon exists: a hidden window must always have a way
+/// back, so close-to-tray is refused when the tray could not be created.
+static TRAY_READY: AtomicBool = AtomicBool::new(false);
+
+fn tray_ready() -> bool {
+    TRAY_READY.load(Ordering::Relaxed)
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            show_main_window(app);
+        }
+    }
+}
+
+/// Native tray: show/hide, quick engage, DHCP reset, flush and a real quit.
+/// Actions that depend on the selected adapter are emitted to the frontend.
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let toggle = MenuItem::with_id(app, "toggle", "Show / Hide Dns Master", true, None::<&str>)?;
+    let engage = MenuItem::with_id(
+        app,
+        "engage",
+        "Quick Engage: Primary Pinned / Electro",
+        true,
+        None::<&str>,
+    )?;
+    let reset = MenuItem::with_id(app, "reset-dhcp", "Reset to DHCP", true, None::<&str>)?;
+    let flush = MenuItem::with_id(app, "flush-dns", "Flush DNS Cache", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Dns Master", true, None::<&str>)?;
+    let separator_one = PredefinedMenuItem::separator(app)?;
+    let separator_two = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &toggle,
+            &engage,
+            &separator_one,
+            &reset,
+            &flush,
+            &separator_two,
+            &quit,
+        ],
+    )?;
+
+    let Some(icon) = app.default_window_icon().cloned() else {
+        return Ok(());
+    };
+    TrayIconBuilder::new()
+        .icon(icon)
+        .tooltip("Dns Master")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "toggle" => toggle_main_window(app),
+            "quit" => app.exit(0),
+            action => {
+                let _ = app.emit("tray:action", action.to_string());
+            }
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    TRAY_READY.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(Mutex::new(TrafficMonitorState::default()))
+        .setup(|app| {
+            if let Err(error) = build_tray(app) {
+                eprintln!("Dns Master: system tray unavailable: {error}");
+            }
+            // Windows startup launches with --minimized; respect it only when
+            // the user asked to keep the app in the tray.
+            if tray_ready()
+                && std::env::args().any(|arg| arg == "--minimized")
+                && store::load().settings.minimize_to_tray
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if tray_ready() && store::load().settings.minimize_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_network_adapters,
             get_live_traffic,
@@ -1002,7 +1153,12 @@ pub fn run() {
             run_bypass_probe,
             load_persisted_state,
             save_persisted_state,
-            sync_github_dns_list
+            sync_github_dns_list,
+            import_dns_manifest,
+            get_autostart_enabled,
+            set_autostart_enabled,
+            handle_window_close,
+            exit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running Dns Master");

@@ -155,6 +155,44 @@ export function invokeSyncGithubDnsList(url: string): Promise<SyncedDnsServer[]>
   return invokeCommand<SyncedDnsServer[]>("sync_github_dns_list", { url });
 }
 
+/** Hides to the tray when enabled, otherwise exits the process. */
+export function invokeHandleWindowClose(minimizeToTray: boolean): Promise<void> {
+  return invokeCommand<void>("handle_window_close", { minimizeToTray });
+}
+
+/** Always quits, even when minimize-to-tray is enabled. */
+export function invokeExitApp(): Promise<void> {
+  return invokeCommand<void>("exit_app");
+}
+
+/** True Windows startup registration (`HKCU\...\Run` value `DnsMaster`). */
+export function fetchAutostartEnabled(): Promise<boolean | null> {
+  return invokeSafe<boolean>("get_autostart_enabled");
+}
+
+/** Writes or removes the startup value and returns the verified state. */
+export function setAutostartEnabled(enabled: boolean): Promise<boolean> {
+  return invokeCommand<boolean>("set_autostart_enabled", { enabled });
+}
+
+/** Validates a local manifest with the same rules as the GitHub sync. */
+export function invokeImportDnsManifest(json: string): Promise<SyncedDnsServer[]> {
+  return invokeCommand<SyncedDnsServer[]>("import_dns_manifest", { json });
+}
+
+/** Tray menu actions that need the frontend's selected adapter. */
+export async function listenTrayActions(
+  handler: (action: string) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    return await listen<string>("tray:action", (event) => handler(event.payload));
+  } catch {
+    return () => {};
+  }
+}
+
 /**
  * Streams one event per finished resolver during a sweep. Returns a no-op
  * unsubscribe outside Tauri or when the event bridge is unavailable.

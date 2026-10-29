@@ -733,3 +733,72 @@ Live host checks: `curl.exe` fetched a real `raw.githubusercontent.com` URL thro
 - Benchmark progress events are best-effort: if the event bridge is unavailable the sweep still completes and the UI writes the final batch.
 - No automated frontend test runner; the store logic is verified by TypeScript plus the Rust contract tests.
 
+# Dns Master — Phase 5 Final Release Report (v1.0.0)
+
+Phase 5 turned the Phase 4 core into a shippable desktop app: real Windows startup, a tray lifecycle, portable JSON lists, the last edge cases, release metadata and documentation.
+
+## 33. Real Windows startup
+
+`src-tauri/src/autostart.rs` (new) uses the existing `windows-sys` dependency, so no crate was added:
+
+- `format_run_command` builds the exact `REG_SZ` payload, `"<exe>" --minimized` (unit-tested with a path containing spaces).
+- `write_value` / `delete_value` call `RegSetValueExW` / `RegDeleteValueW` on `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value name `DnsMaster`; `read_value` uses `RegQueryValueExW`.
+- `set_enabled` writes or removes the value, then returns the verified registry state rather than the requested one. A missing value on delete is treated as success.
+- Commands `get_autostart_enabled` and `set_autostart_enabled(enabled)` stay private `fn` (the rustc 1.98.1 + tauri-macros 2.7.4 `E0255` constraint from Phase 3).
+
+The frontend treats Windows as the source of truth: on hydration it calls `setAutostartEnabled(persisted.launchWithWindows ?? default)` and stores the verified result, which also repairs a Run value deleted outside the app. Toggling the switch writes immediately and reverts the UI with a toast when the registry refuses.
+
+## 34. Tray, close-to-tray and quit
+
+- `build_tray` creates a menu with show/hide, *Quick Engage: Primary Pinned / Electro*, *Reset to DHCP*, *Flush DNS Cache* and *Quit Dns Master*. Left-click restores and focuses the window; the menu does not open on left click.
+- Actions that need the selected adapter (`engage`, `reset-dhcp`, `flush-dns`) are emitted as `tray:action`; Rust owns show/hide and quit. `AppStore` subscribes through `listenTrayActions` and dispatches to `applyDns`, `resetDhcp`, `flushDns` via a ref, so the listener is registered once.
+- `TRAY_READY: AtomicBool` is set only after the icon is built. Close-to-tray, the `--minimized` hide and the `on_window_event` `CloseRequested` guard all require it, so a failed tray build can never strand a hidden window; the close then exits.
+- Two close paths: the custom header button calls `handle_window_close(minimizeToTray)`, and the native close event is intercepted by `on_window_event`. Explicit quit uses `exit_app` (`app.exit(0)`) from the tray or the Settings diagnostics card and always exits.
+- At startup, `--minimized` plus `minimize_to_tray` hides the main window in `setup`; otherwise the window shows normally.
+
+## 35. JSON import / export
+
+- `exportDnsManifest` builds `{ "version": 1, "servers": [...] }` from the unique custom + pinned rows and downloads `dns_list.json` through a Blob link.
+- `import_dns_manifest(json)` reuses `sync::parse_manifest`, so a local file passes the exact GitHub-sync validation (IPv4 primary, optional secondary, category normalization, dedupe, one bad row rejects the file).
+- Both paths share `mergeIncomingServers`: merge by primary IPv4, keep real latency/jitter/uptime/pins, imported rows become `custom` (user-owned, deletable), and a GitHub pull never overwrites a custom row.
+
+## 36. Phase 4 edge cases
+
+- `PersistedAppState.pins_initialized` (serde default `false`) is written `true` by the frontend. An empty pin list is now the user's choice after the first save; only pre-flag files fall back to the "fresh install keeps seed pins" heuristic. Covered by a new store test.
+- Desktop notifications use the WebView2 `Notification` API only when `notifications` is on, permission is granted and the window is hidden or unfocused, so an attended user never gets the toast twice. Enabling the setting requests permission.
+- Settings copy now states the real behaviour (registry path, tray close, background notices).
+
+## 37. Release metadata and docs
+
+- Version `1.0.0` in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and `src-tauri/tauri.conf.json`.
+- UI shows `v1.0.0 · release` in the header chip, `Control Deck · v1.0.0 · RELEASE` in the sidebar and `Dns Master 1.0.0` / `v1.0.0 · release` in Settings.
+- `README.md` documents features, the GitHub-hosted resolver list workflow, the accepted manifest schema, dev/build commands and the UAC/tray/startup notes.
+- Settings lists the five new commands and adds export/import plus a quit button to the diagnostics card.
+
+## 38. Tests and verification
+
+```text
+cargo test --manifest-path src-tauri/Cargo.toml --offline
++ 45 passed; 0 failed (lib)
+
+npx tsc --noEmit
++ exit 0
+
+npm run build
++ tsc --noEmit && vite build
++ built in 4.54s
++ dist/assets/index-*.js   354.90 kB
++ dist/assets/charts-*.js  356.70 kB
++ dist/assets/index-*.css   69.33 kB
+```
+
+New coverage (3 tests): the `REG_SZ` command line with quotes and `--minimized`; a read-only live `is_enabled()` probe; and `pins_initialized` surviving save/load while an empty pin list stays empty. The Settings view was also checked in a browser at 1440x900 (version badge, export/import, quit, command list all render).
+
+## 39. Known limits / not executed
+
+- The native debug executable was not launched for end-to-end tray testing: first-run hydration writes `HKCU\...\Run\DnsMaster` pointing at `target\debug\dns-master.exe`, which would be a wrong startup entry. Tray behaviour is verified by compilation and the guarded code paths; the first real installer run should be watched.
+- Startup registration defaults to on (the existing `launchWithWindows` default), so a first run writes the Run value for the current executable. That is intended, but a portable build moved after enabling needs the toggle re-applied.
+- Notifications depend on WebView2 permission; if the user denies it, only the in-app toast remains.
+- Export includes custom and pinned rows only; GitHub-synced rows are expected to come from the remote manifest.
+- No automated frontend test runner; the store logic is verified by TypeScript plus the Rust contract tests.
+

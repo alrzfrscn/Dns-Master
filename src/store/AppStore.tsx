@@ -21,6 +21,7 @@ import type {
   NetworkAdapter,
   PersistedAppState,
   PersistedSettings,
+  SyncedDnsServer,
   TrafficPoint,
   TrafficStats,
   ViewId,
@@ -34,7 +35,9 @@ import {
   fetchNetworkAdapters,
   fetchPersistedState,
   invokeBenchmarkDnsServers,
+  invokeExitApp,
   invokeFlushDns,
+  invokeImportDnsManifest,
   invokePingDnsServer,
   invokeResetDns,
   invokeRestorePreviousDns,
@@ -42,8 +45,11 @@ import {
   invokeSetDns,
   invokeSetIpv6,
   invokeSyncGithubDnsList,
+  isTauri,
   listenBenchmarkProgress,
+  listenTrayActions,
   savePersistedState,
+  setAutostartEnabled,
 } from "../lib/tauri";
 
 const HISTORY_LENGTH = 48;
@@ -111,6 +117,12 @@ interface AppContextValue {
   resetSettings: () => void;
   syncFromGithub: () => Promise<void>;
   syncing: boolean;
+  /** Downloads the custom + pinned resolvers as a `{ servers: [...] }` manifest. */
+  exportDnsManifest: () => void;
+  /** Validates and merges a local manifest with the GitHub sync rules. */
+  importDnsManifest: (json: string) => Promise<void>;
+  /** Quits the process even when minimize-to-tray is enabled. */
+  exitApp: () => void;
 
   toasts: { id: string; title: string; detail?: string; tone: "info" | "success" | "warning" | "error" }[];
   pushToast: (title: string, tone?: "info" | "success" | "warning" | "error", detail?: string) => void;
@@ -219,15 +231,64 @@ function mergePersistedServers(
   seed.forEach(add);
 
   if (!persisted) return [...byPrimary.values()];
-  // A state file with no rows and no pins is a first run, not "unpin
-  // everything": keep the seed pins in that case.
-  const hasUserState =
-    persisted.pinnedServerIds.length > 0 ||
-    persisted.customDns.length > 0 ||
-    persisted.syncedDns.length > 0;
-  if (!hasUserState) return [...byPrimary.values()];
+  // Files written before the pin flag existed cannot tell "first run" from
+  // "unpinned everything", so only those keep the seed pins when empty.
+  if (!persisted.pinsInitialized) {
+    const hasUserState =
+      persisted.pinnedServerIds.length > 0 ||
+      persisted.customDns.length > 0 ||
+      persisted.syncedDns.length > 0;
+    if (!hasUserState) return [...byPrimary.values()];
+  }
   const pins = new Set(persisted.pinnedServerIds);
   return [...byPrimary.values()].map((server) => ({ ...server, pinned: pins.has(server.id) }));
+}
+
+/**
+ * Merges validated manifest rows by primary IPv4. Real measurements and pins
+ * survive; a user-created row is never overwritten by a GitHub pull. Imported
+ * rows become `custom`, so the user owns and can delete them.
+ */
+function mergeIncomingServers(
+  current: DnsServer[],
+  incoming: SyncedDnsServer[],
+  custom: boolean,
+): { next: DnsServer[]; added: number; updated: number } {
+  const byPrimary = new Map(current.map((server) => [server.primary, server]));
+  const next = current.slice();
+  let added = 0;
+  let updated = 0;
+
+  for (const entry of incoming) {
+    const existing = byPrimary.get(entry.primary);
+    if (existing?.custom && !custom) continue;
+    const row: DnsServer = {
+      id: entry.id || existing?.id || `sync-${entry.primary.replace(/\./g, "-")}`,
+      name: entry.name,
+      nameFa: entry.nameFa ?? undefined,
+      provider: entry.provider || entry.name,
+      primary: entry.primary,
+      secondary: entry.secondary,
+      category: entry.category,
+      tags: entry.tags.length > 0 ? entry.tags : [custom ? "import" : "github"],
+      description: entry.description ?? undefined,
+      latency: existing?.latency ?? null,
+      jitter: existing?.jitter ?? null,
+      uptime: existing?.uptime ?? 100,
+      pinned: existing?.pinned ?? false,
+      custom,
+      synced: !custom,
+    };
+    if (existing) {
+      next[next.indexOf(existing)] = row;
+      updated += 1;
+    } else {
+      next.push(row);
+      added += 1;
+    }
+    byPrimary.set(entry.primary, row);
+  }
+  return { next, added, updated };
 }
 
 function snapshotFromConfig(config: DnsConfig): DnsRollbackSnapshot {
@@ -285,11 +346,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const tickRef = useRef(0);
   const serversRef = useRef(servers);
   const hydrated = useRef(false);
+  const notificationsRef = useRef(DEFAULT_SETTINGS.notifications);
   const syntheticRef = useRef({ down: initialStats.downKbps, up: initialStats.upKbps });
 
   useEffect(() => {
     serversRef.current = servers;
   }, [servers]);
+
+  useEffect(() => {
+    notificationsRef.current = settings.notifications;
+  }, [settings.notifications]);
 
   const activeAdapter = adapters.find((a) => a.id === activeAdapterId) ?? adapters[0];
   const activeDns = useMemo(
@@ -312,6 +378,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, 4200);
+
+      // Native notification only when the window is not in front, so an
+      // attended user does not get the same message twice.
+      const away = document.visibilityState === "hidden" || !document.hasFocus();
+      if (
+        away &&
+        notificationsRef.current &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification(title, { body: detail ?? "", silent: true });
+        } catch {
+          // WebView2 may refuse notifications; the HUD toast already covers it.
+        }
+      }
     },
     [],
   );
@@ -372,6 +454,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           real[0];
         setAdapters(real);
         setBridgeReady(true);
+        // Windows is the source of truth for startup: reconcile the stored
+        // preference with the real Run key (also repairs a deleted value).
+        void setAutostartEnabled(persisted?.settings.launchWithWindows ?? DEFAULT_SETTINGS.autoStart)
+          .then((verified) => setSettings((prev) => ({ ...prev, autoStart: verified })))
+          .catch(() => {});
         setActiveAdapterId(preferred.id);
         const bound = await syncDns(preferred.id, merged);
         if (cancelled) return;
@@ -407,6 +494,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       customDns: servers.filter((server) => server.custom),
       syncedDns: servers.filter((server) => server.synced),
       pinnedServerIds: servers.filter((server) => server.pinned).map((server) => server.id),
+      pinsInitialized: true,
       settings: settingsToPersisted(settings, activeAdapterId, activeDnsId),
       previousDnsSnapshot,
     };
@@ -1098,9 +1186,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     pushToast("Bypass probe finished", "success", `Resolver under test: ${resolverLabel}`);
   }, [activeDns, dnsConfig, activeAdapterId, bridgeReady, bypassRunning, pushToast]);
 
-  const updateSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const updateSetting = useCallback(
+    <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+      setSettings((prev) => ({ ...prev, [key]: value }));
+
+      if (key === "autoStart") {
+        const enabled = value as boolean;
+        if (!isTauri()) return;
+        void setAutostartEnabled(enabled)
+          .then((verified) => setSettings((prev) => ({ ...prev, autoStart: verified })))
+          .catch((error) => {
+            // The registry refused: show the real state, not the wish.
+            setSettings((prev) => ({ ...prev, autoStart: !enabled }));
+            pushToast("Startup entry failed", "error", describeError(error));
+          });
+      }
+
+      if (key === "notifications" && value && typeof Notification !== "undefined") {
+        if (Notification.permission === "default") {
+          void Notification.requestPermission().catch(() => {});
+        }
+      }
+    },
+    [pushToast],
+  );
 
   const resetSettings = useCallback(() => {
     setSettings({ ...DEFAULT_SETTINGS });
@@ -1127,43 +1236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       const incoming = await invokeSyncGithubDnsList(settings.githubRawUrl);
-      const current = serversRef.current;
-      const byPrimary = new Map(current.map((server) => [server.primary, server]));
-      const next = current.slice();
-      let added = 0;
-      let updated = 0;
-
-      for (const entry of incoming) {
-        const existing = byPrimary.get(entry.primary);
-        // A user-created resolver keeps its own name and never gets overwritten.
-        if (existing?.custom) continue;
-        const row: DnsServer = {
-          id: entry.id || existing?.id || `sync-${entry.primary.replace(/\./g, "-")}`,
-          name: entry.name,
-          nameFa: entry.nameFa ?? undefined,
-          provider: entry.provider || entry.name,
-          primary: entry.primary,
-          secondary: entry.secondary,
-          category: entry.category,
-          tags: entry.tags.length > 0 ? entry.tags : ["github"],
-          description: entry.description ?? undefined,
-          // Real measurements survive a sync; pins are handled separately.
-          latency: existing?.latency ?? null,
-          jitter: existing?.jitter ?? null,
-          uptime: existing?.uptime ?? 100,
-          pinned: existing?.pinned ?? false,
-          synced: true,
-        };
-        if (existing) {
-          next[next.indexOf(existing)] = row;
-          updated += 1;
-        } else {
-          next.push(row);
-          added += 1;
-        }
-        byPrimary.set(entry.primary, row);
-      }
-
+      const { next, added, updated } = mergeIncomingServers(serversRef.current, incoming, false);
       serversRef.current = next;
       setServers(next);
       pushToast(
@@ -1177,6 +1250,109 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSyncing(false);
     }
   }, [settings.githubRawUrl, syncing, bridgeReady, pushToast]);
+
+  /** `{ servers: [...] }` manifest of the user's own and pinned resolvers. */
+  const exportDnsManifest = useCallback(() => {
+    const byPrimary = new Map<string, DnsServer>();
+    for (const server of servers) {
+      if ((server.custom || server.pinned) && !byPrimary.has(server.primary)) {
+        byPrimary.set(server.primary, server);
+      }
+    }
+    const rows = [...byPrimary.values()];
+    if (rows.length === 0) {
+      pushToast("Nothing to export", "warning", "Pin or create a resolver first");
+      return;
+    }
+    const manifest = {
+      version: 1,
+      servers: rows.map((server) => ({
+        id: server.id,
+        name: server.name,
+        nameFa: server.nameFa ?? null,
+        provider: server.provider,
+        primary: server.primary,
+        secondary: server.secondary,
+        category: server.category,
+        tags: server.tags,
+        description: server.description ?? null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "dns_list.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    pushToast("Manifest exported", "success", `${rows.length} resolvers · dns_list.json`);
+  }, [servers, pushToast]);
+
+  /** Local import through the Rust validator, merged like a GitHub pull. */
+  const importDnsManifest = useCallback(
+    async (json: string) => {
+      if (!bridgeReady) {
+        pushToast("Import needs the desktop core", "warning", "The manifest validator runs in Rust");
+        return;
+      }
+      try {
+        const incoming = await invokeImportDnsManifest(json);
+        const { next, added, updated } = mergeIncomingServers(serversRef.current, incoming, true);
+        serversRef.current = next;
+        setServers(next);
+        pushToast(
+          "Manifest imported",
+          "success",
+          `${incoming.length} verified · ${added} added · ${updated} updated`,
+        );
+      } catch (error) {
+        pushToast("Import failed", "error", describeError(error));
+      }
+    },
+    [bridgeReady, pushToast],
+  );
+
+  const exitApp = useCallback(() => {
+    if (!isTauri()) {
+      pushToast("Quit needs the desktop shell", "info");
+      return;
+    }
+    void invokeExitApp().catch((error) => pushToast("Quit failed", "error", describeError(error)));
+  }, [pushToast]);
+
+  /* Tray actions that need the selected adapter; Rust owns show/hide and quit. */
+  const trayActionsRef = useRef({ applyDns, resetDhcp, flushDns, servers });
+  useEffect(() => {
+    trayActionsRef.current = { applyDns, resetDhcp, flushDns, servers };
+  }, [applyDns, resetDhcp, flushDns, servers]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    void listenTrayActions((action) => {
+      const handlers = trayActionsRef.current;
+      if (action === "engage") {
+        const target =
+          handlers.servers.find((server) => server.pinned) ??
+          handlers.servers.find((server) => server.id === "electro") ??
+          handlers.servers[0];
+        if (target) handlers.applyDns(target.id);
+      } else if (action === "reset-dhcp") {
+        handlers.resetDhcp();
+      } else if (action === "flush-dns") {
+        void handlers.flushDns();
+      }
+    }).then((stop) => {
+      if (cancelled) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -1221,6 +1397,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetSettings,
       syncFromGithub,
       syncing,
+      exportDnsManifest,
+      importDnsManifest,
+      exitApp,
       toasts,
       pushToast,
       dismissToast,
@@ -1266,6 +1445,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetSettings,
       syncFromGithub,
       syncing,
+      exportDnsManifest,
+      importDnsManifest,
+      exitApp,
       toasts,
       pushToast,
       dismissToast,

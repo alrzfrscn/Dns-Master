@@ -3,7 +3,7 @@ import type { ViewId } from "../../types/network";
 import { useApp } from "../../store/AppStore";
 import { cn } from "../../lib/cn";
 import { latencyTone } from "../../lib/format";
-import { windowAction } from "../../lib/tauri";
+import { invokeHandleWindowClose, isTauri, windowAction } from "../../lib/tauri";
 
 const VIEW_META: Record<ViewId, { eyebrow: string; title: string; caption: string }> = {
   dashboard: { eyebrow: "Operations / 01", title: "Control Deck", caption: "Resolver state & live throughput" },
@@ -13,11 +13,20 @@ const VIEW_META: Record<ViewId, { eyebrow: string; title: string; caption: strin
 };
 
 export function Header() {
-  const { view, connection, activeDns, activeAdapter, stats, pushToast } = useApp();
+  const { view, connection, activeDns, activeAdapter, stats, settings, pushToast } = useApp();
   const meta = VIEW_META[view];
   const connected = connection.phase === "connected";
 
   const runWindowAction = async (action: "minimize" | "toggleMaximize" | "close") => {
+    if (action === "close" && isTauri()) {
+      try {
+        // Close-to-tray when enabled; otherwise a real exit.
+        await invokeHandleWindowClose(settings.minimizeToTray);
+        return;
+      } catch {
+        // Fall through to the native close below.
+      }
+    }
     const handled = await windowAction(action);
     if (!handled) {
       pushToast("Desktop-only control", "info", "Window controls need the Tauri desktop shell");
@@ -72,6 +81,10 @@ export function Header() {
           <span className={cn("font-mono text-[9.5px] tabular-nums", latencyTone(stats.latencyMs))}>
             {Math.round(stats.latencyMs)} ms
           </span>
+        </span>
+
+        <span className="inline-flex items-center rounded-lg border border-violet/25 bg-violet/[0.07] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-violet">
+          v1.0.0 · release
         </span>
       </div>
 

@@ -47,7 +47,7 @@ export function Sidebar() {
             <span className="font-display text-[15px] font-bold tracking-[0.18em] text-neon">MASTER</span>
           </div>
           <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.24em] text-ink-500">
-            Control Deck · v0.1
+            Control Deck · v1.0.0 · RELEASE
           </p>
         </div>
       </div>

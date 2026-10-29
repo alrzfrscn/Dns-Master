@@ -251,6 +251,8 @@ export interface PersistedAppState {
   customDns: DnsServer[];
   syncedDns: DnsServer[];
   pinnedServerIds: string[];
+  /** True once a state file was written; an empty pin list then means "none". */
+  pinsInitialized: boolean;
   settings: PersistedSettings;
   previousDnsSnapshot: DnsRollbackSnapshot | null;
 }

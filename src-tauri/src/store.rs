@@ -82,6 +82,10 @@ pub struct PersistedAppState {
     pub custom_dns: Vec<DnsEntry>,
     pub synced_dns: Vec<DnsEntry>,
     pub pinned_server_ids: Vec<String>,
+    /// Set once the frontend has written a state file, so an empty pin list
+    /// means "nothing pinned" instead of a first run.
+    #[serde(default)]
+    pub pins_initialized: bool,
     pub settings: PersistedSettings,
     pub previous_dns_snapshot: Option<DnsRollbackSnapshot>,
 }
@@ -201,6 +205,7 @@ mod tests {
                 ..DnsEntry::default()
             }],
             pinned_server_ids: vec!["custom-1".into(), "electro".into()],
+            pins_initialized: true,
             settings: PersistedSettings {
                 reapply_last_resolver: true,
                 preferred_adapter_id: "{GUID}".into(),
@@ -236,10 +241,29 @@ mod tests {
         assert!(!parsed.custom_dns[0].custom);
         assert!(parsed.synced_dns.is_empty());
         assert!(parsed.pinned_server_ids.is_empty());
+        assert!(!parsed.pins_initialized, "old files predate the pin flag");
         assert!(parsed.previous_dns_snapshot.is_none());
         assert!(!parsed.settings.minimize_to_tray);
         assert!(parsed.settings.launch_with_windows);
         assert_eq!(parsed.settings.github_sync_url, DEFAULT_SYNC_URL);
+    }
+
+    #[test]
+    fn keeps_an_empty_pin_list_when_pins_are_initialized() {
+        let dir = scratch_dir();
+        let path = dir.join(STATE_FILE);
+        let state = PersistedAppState {
+            pins_initialized: true,
+            ..PersistedAppState::default()
+        };
+        save_to(&path, &state).expect("save");
+        let loaded = load_from(&path);
+        assert!(loaded.pins_initialized, "the flag survives a restart");
+        assert!(
+            loaded.pinned_server_ids.is_empty(),
+            "zero pins is the user's choice, not a fresh install"
+        );
+        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   Cable,
   CheckCircle2,
@@ -8,8 +8,10 @@ import {
   HardDriveDownload,
   Info,
   Loader2,
+  LogOut,
   RotateCcw,
   ShieldCheck,
+  Upload,
   Wifi,
 } from "lucide-react";
 import type { AdapterKind } from "../../types/network";
@@ -42,7 +44,23 @@ export function SettingsView() {
     bridgeReady,
     telemetryLive,
     stats,
+    exportDnsManifest,
+    importDnsManifest,
+    exitApp,
   } = useApp();
+
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      await importDnsManifest(await file.text());
+    } catch {
+      pushToast("Import failed", "error", "The file could not be read");
+    } finally {
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
 
   const urlValid = useMemo(() => {
     try {
@@ -194,6 +212,38 @@ export function SettingsView() {
               {servers.length} persisted
             </span>
           </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={exportDnsManifest}
+              className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] font-mono text-[7px] uppercase tracking-[0.1em] text-ink-300 transition-colors hover:border-neon/30 hover:text-neon"
+            >
+              <Download size={9} /> export json
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="flex h-7 items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] font-mono text-[7px] uppercase tracking-[0.1em] text-ink-300 transition-colors hover:border-violet/40 hover:text-violet"
+            >
+              <Upload size={9} /> import json
+            </button>
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            aria-label="Import DNS manifest"
+            onChange={(event) => void importFile(event.target.files?.[0])}
+          />
+          <p className="mt-1.5 text-[8px] leading-snug text-ink-600">
+            Export writes your custom + pinned resolvers as{" "}
+            <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[7.5px] text-ink-300">
+              {"{ servers: [...] }"}
+            </code>{" "}
+            — commit it to your own repo and point the URL above at the raw file. Import uses the same validator.
+          </p>
         </GlassCard>
 
         {/* Bridge */}
@@ -237,6 +287,11 @@ export function SettingsView() {
               "load_persisted_state",
               "save_persisted_state",
               "sync_github_dns_list",
+              "import_dns_manifest",
+              "get_autostart_enabled",
+              "set_autostart_enabled",
+              "handle_window_close",
+              "exit_app",
             ].map((command) => (
               <span key={command} className="truncate font-mono text-[8px] leading-relaxed text-ink-400">
                 {command}()
@@ -264,7 +319,7 @@ export function SettingsView() {
               {
                 key: "autoStart" as const,
                 title: "Launch with Windows",
-                detail: "Add Dns Master to the current user's startup entries.",
+                detail: "Writes HKCU\\...\\Run · starts minimized in the tray.",
               },
               {
                 key: "autoConnect" as const,
@@ -274,12 +329,12 @@ export function SettingsView() {
               {
                 key: "minimizeToTray" as const,
                 title: "Minimize to tray",
-                detail: "Keep monitoring while the window is hidden.",
+                detail: "Close hides the window; quit from here or the tray.",
               },
               {
                 key: "notifications" as const,
                 title: "Desktop notifications",
-                detail: "Report resolver changes and blocked probes.",
+                detail: "Native notice when the window is in the background.",
               },
             ].map((row) => (
               <div key={row.key} className="flex items-center gap-2 py-2 first:pt-1.5 last:pb-1">
@@ -305,8 +360,8 @@ export function SettingsView() {
 
           <div className="mt-2 space-y-1.5">
             {[
-              { label: "App", value: "Dns Master 0.1.0" },
-              { label: "Channel", value: "Phase 4 · persistent core" },
+              { label: "App", value: "Dns Master 1.0.0" },
+              { label: "Channel", value: "v1.0.0 · release" },
               { label: "Frontend", value: "React 19 · Vite 7" },
               { label: "Styling", value: "Tailwind CSS 4" },
               { label: "Backend", value: "Tauri 2 · Win32 API" },
@@ -337,6 +392,14 @@ export function SettingsView() {
               <RotateCcw size={9} /> defaults
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={exitApp}
+            className="mt-1.5 flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-rose/25 bg-rose/[0.05] font-mono text-[7px] uppercase tracking-[0.1em] text-rose/90 transition-colors hover:border-rose/45 hover:bg-rose/10"
+          >
+            <LogOut size={9} /> quit dns master
+          </button>
         </GlassCard>
 
         <GlassCard className="p-3">
