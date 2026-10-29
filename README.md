@@ -402,8 +402,6 @@ graph TB
 
 ## 🤝 Contributing
 
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) first.
-
 ### Quick Contribution Checklist
 - [ ] Fork the repo
 - [ ] Create feature branch (`git checkout -b feature/amazing-feature`)
