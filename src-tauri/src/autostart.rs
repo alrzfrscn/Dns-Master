@@ -137,6 +137,13 @@ fn delete_value() -> Result<(), CommandError> {
     }
 }
 
+/// Debug builds must never register `target\debug\dns-master.exe`. Set
+/// `DNSMASTER_TEST_AUTOSTART=1` to exercise the real write path in a test.
+#[cfg(windows)]
+fn can_write_startup() -> bool {
+    !cfg!(debug_assertions) || std::env::var_os("DNSMASTER_TEST_AUTOSTART").is_some()
+}
+
 /// True when the startup value exists and is not blank.
 pub fn is_enabled() -> bool {
     #[cfg(windows)]
@@ -153,6 +160,9 @@ pub fn is_enabled() -> bool {
 pub fn set_enabled(enabled: bool) -> Result<bool, CommandError> {
     #[cfg(windows)]
     {
+        if !can_write_startup() {
+            return Ok(is_enabled());
+        }
         if enabled {
             let exe = std::env::current_exe().map_err(|error| {
                 autostart_error(format!(
@@ -187,6 +197,14 @@ mod tests {
             r#""C:\Program Files\Dns Master\dns-master.exe" --minimized"#
         );
         assert!(command.starts_with('"') && command.ends_with("--minimized"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn debug_builds_skip_the_run_key_unless_opted_in() {
+        if cfg!(debug_assertions) && std::env::var_os("DNSMASTER_TEST_AUTOSTART").is_none() {
+            assert!(!can_write_startup());
+        }
     }
 
     #[cfg(windows)]

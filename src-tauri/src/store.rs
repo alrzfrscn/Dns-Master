@@ -15,7 +15,7 @@ const APP_DIR: &str = "com.dnsmaster.desktop";
 const STATE_FILE: &str = "state.json";
 
 pub const DEFAULT_SYNC_URL: &str =
-    "https://raw.githubusercontent.com/dnsmaster/dns-list/main/dns_list.json";
+    "https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json";
 
 /// One resolver as the frontend stores it (`DnsServer`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -54,7 +54,7 @@ pub struct PersistedSettings {
 impl Default for PersistedSettings {
     fn default() -> Self {
         Self {
-            launch_with_windows: true,
+            launch_with_windows: false,
             reapply_last_resolver: false,
             minimize_to_tray: true,
             desktop_notifications: true,
@@ -244,7 +244,7 @@ mod tests {
         assert!(!parsed.pins_initialized, "old files predate the pin flag");
         assert!(parsed.previous_dns_snapshot.is_none());
         assert!(!parsed.settings.minimize_to_tray);
-        assert!(parsed.settings.launch_with_windows);
+        assert!(!parsed.settings.launch_with_windows);
         assert_eq!(parsed.settings.github_sync_url, DEFAULT_SYNC_URL);
     }
 

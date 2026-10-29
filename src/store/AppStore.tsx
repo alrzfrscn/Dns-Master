@@ -183,8 +183,8 @@ const initialBenchmark: BenchmarkSession = {
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
-  githubRawUrl: "https://raw.githubusercontent.com/dnsmaster/dns-list/main/dns_list.json",
-  autoStart: true,
+  githubRawUrl: "https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json",
+  autoStart: false,
   autoConnect: false,
   minimizeToTray: true,
   notifications: true,

@@ -1,136 +1,524 @@
 {
-    "Iranian": {
-        "Shecan": [
-            "178.22.122.100",
-            "185.51.200.2"
-        ],
-        "Radar": [
-            "10.202.10.10",
-            "10.202.10.11"
-        ],
-        "Electro": [
-            "78.157.42.100",
-            "78.157.42.101"
-        ],
-        "Begzar": [
-            "185.55.225.25",
-            "185.55.226.26"
-        ],
-        "403": [
-            "10.202.10.202",
-            "10.202.10.102"
-        ],
-        "Shatel": [
-            "85.15.1.14",
-            "85.15.1.15"
-        ],
-        "Shelter": [
-            "78.157.60.6",
-            "78.157.60.242"
-        ],
-        "Beshkan": [
-            "181.41.194.177",
-            "181.41.194.186"
-        ],
-        "Shecan 2": [
-            "178.22.122.101",
-            "185.51.200.1"
-        ],
-        "Begzar 2": [
-            "185.55.224.24",
-            ""
-        ],
-        "Shelter 2": [
-            "91.92.250.185",
-            "91.92.244.233"
-        ],
-        "Hamrah Aval": [
-            "208.67.220.200",
-            "208.67.222.222"
-        ],
-        "Irancell": [
-            "74.82.42.42",
-            "0.0.0.0"
-        ],
-        "Rightel": [
-            "91.239.100.100",
-            "89.223.43.71"
-        ],
-        "NobarCloud": [
-            "78.110.120.220",
-            "78.110.120.200"
-        ],
-        "DynX": [
-            "193.24.103.1",
-            "193.24.103.2"
-        ],
-        "Bertina": [
-            "193.186.32.32",
-            ""
-        ],
-        "Hostiran": [
-            "172.29.0.100",
-            "172.29.2.100"
-        ],
-        "Vanilla": [
-            "10.139.177.21",
-            "10.139.177.22"
-        ]
+  "version": 1,
+  "updatedAt": "2026-10-23",
+  "source": "https://github.com/alrzfrscn/Dns-Master",
+  "servers": [
+    {
+      "id": "electro",
+      "name": "Electro",
+      "nameFa": "الکترو",
+      "provider": "Electro",
+      "primary": "78.157.42.100",
+      "secondary": "78.157.42.101",
+      "category": "gaming",
+      "tags": [
+        "gaming",
+        "low-ping",
+        "iran"
+      ],
+      "description": "Iranian gaming resolver tuned for low-latency matchmaking and console traffic.",
+      "latency": 24,
+      "uptime": 99.7,
+      "pinned": true
     },
-    "Foreign": {
-        "Google": [
-            "8.8.8.8",
-            "8.8.4.4",
-            "2001:4860:4860::8888",
-            "2001:4860:4860::8844"
-        ],
-        "Cloudflare": [
-            "1.1.1.1",
-            "1.0.0.1",
-            "2606:4700:4700::1111",
-            "2606:4700:4700::1001"
-        ],
-        "OpenDNS": [
-            "208.67.222.222",
-            "208.67.220.220",
-            "2620:119:35::35",
-            "2620:119:53::53"
-        ],
-        "Comodo": [
-            "8.26.56.26",
-            "8.20.247.20"
-        ],
-        "Quad9": [
-            "9.9.9.9",
-            "149.112.112.112",
-            "2620:fe::fe",
-            "2620:fe::9"
-        ],
-        "AlternateDNS": [
-            "76.76.19.19",
-            "76.223.122.150",
-            "2602:fcbc::ad",
-            "2602:fcbc:2::ad"
-        ],
-        "Control D": [
-            "76.76.2.0",
-            "76.76.10.0",
-            "2606:1a40::",
-            "2606:1a40:1::"
-        ],
-        "Yandex": [
-            "77.88.8.8",
-            "77.88.8.1",
-            "2a02:6b8::feed:0ff",
-            "2a02:6b8:0:1::feed:0ff"
-        ],
-        "Cisco": [
-            "208.67.222.222",
-            "208.67.222.20"
-        ],
-        "Verisign": [
-            "64.6.64.6",
-            "64.6.65.6"
-        ]
+    {
+      "id": "radar-game",
+      "name": "Radar Game",
+      "nameFa": "رادار گیم",
+      "provider": "Radar",
+      "primary": "10.202.10.10",
+      "secondary": "10.202.10.11",
+      "category": "gaming",
+      "tags": [
+        "gaming",
+        "console",
+        "iran"
+      ],
+      "description": "Game-first DNS with domestic peering for PlayStation, Xbox and Steam.",
+      "latency": 31,
+      "uptime": 99.4,
+      "pinned": true
+    },
+    {
+      "id": "shecan",
+      "name": "Shecan",
+      "nameFa": "شکن",
+      "provider": "Shecan",
+      "primary": "178.22.122.100",
+      "secondary": "185.51.200.2",
+      "category": "sanction",
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
+      "description": "The classic sanction-bypass resolver for developer and AI services.",
+      "latency": 38,
+      "uptime": 99.9,
+      "pinned": true
+    },
+    {
+      "id": "403",
+      "name": "403.online",
+      "nameFa": "۴۰۳ آنلاین",
+      "provider": "403",
+      "primary": "10.202.10.202",
+      "secondary": "10.202.10.102",
+      "category": "sanction",
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
+      "description": "High-throughput bypass DNS for streaming and developer platforms.",
+      "latency": 42,
+      "uptime": 99.2,
+      "pinned": true
+    },
+    {
+      "id": "begzar",
+      "name": "Begzar",
+      "nameFa": "بگذر",
+      "provider": "Begzar",
+      "primary": "185.55.226.26",
+      "secondary": "185.55.225.25",
+      "category": "sanction",
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
+      "description": "Sanction bypass with aggressive cache for fast repeat lookups.",
+      "latency": 47,
+      "uptime": 98.8
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "nameFa": "کلودفلر",
+      "provider": "Cloudflare",
+      "primary": "1.1.1.1",
+      "secondary": "1.0.0.1",
+      "category": "general",
+      "tags": [
+        "general",
+        "anycast",
+        "privacy"
+      ],
+      "description": "Global anycast resolver with strong privacy guarantees.",
+      "latency": 52,
+      "uptime": 100,
+      "ipv6": [
+        "2606:4700:4700::1111",
+        "2606:4700:4700::1001"
+      ]
+    },
+    {
+      "id": "google",
+      "name": "Google Public DNS",
+      "nameFa": "گوگل",
+      "provider": "Google",
+      "primary": "8.8.8.8",
+      "secondary": "8.8.4.4",
+      "category": "general",
+      "tags": [
+        "general",
+        "global"
+      ],
+      "description": "Widely peered public resolver with dependable global routing.",
+      "latency": 58,
+      "uptime": 100,
+      "ipv6": [
+        "2001:4860:4860::8888",
+        "2001:4860:4860::8844"
+      ]
+    },
+    {
+      "id": "quad9",
+      "name": "Quad9",
+      "nameFa": "کواد۹",
+      "provider": "Quad9",
+      "primary": "9.9.9.9",
+      "secondary": "149.112.112.112",
+      "category": "security",
+      "tags": [
+        "security",
+        "malware-block",
+        "global"
+      ],
+      "description": "Blocks known malicious domains using threat intelligence feeds.",
+      "latency": 64,
+      "uptime": 99.9,
+      "ipv6": [
+        "2620:fe::fe",
+        "2620:fe::9"
+      ]
+    },
+    {
+      "id": "adguard",
+      "name": "AdGuard DNS",
+      "nameFa": "ادگارد",
+      "provider": "AdGuard",
+      "primary": "94.140.14.14",
+      "secondary": "94.140.15.15",
+      "category": "security",
+      "tags": [
+        "security",
+        "adblock",
+        "global"
+      ],
+      "description": "Filters ads and trackers at the DNS layer.",
+      "latency": 71,
+      "uptime": 99.8
+    },
+    {
+      "id": "shatel",
+      "name": "Shatel",
+      "nameFa": "شاتل",
+      "provider": "Shatel",
+      "primary": "85.15.1.14",
+      "secondary": "85.15.1.15",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran",
+        "isp"
+      ],
+      "description": "ISP resolver with domestic latency advantages.",
+      "latency": 33,
+      "uptime": 98.5
+    },
+    {
+      "id": "shelter",
+      "name": "Shelter",
+      "nameFa": "شلتر",
+      "provider": "Shelter",
+      "primary": "78.157.60.6",
+      "secondary": "78.157.60.242",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Domestic bypass resolver for blocked developer services.",
+      "latency": 36,
+      "uptime": 99.1
+    },
+    {
+      "id": "shelter-2",
+      "name": "Shelter Alt",
+      "nameFa": "شلتر ۲",
+      "provider": "Shelter",
+      "primary": "91.92.250.185",
+      "secondary": "91.92.244.233",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Secondary Shelter endpoint on alternate network paths.",
+      "latency": 44,
+      "uptime": 98.2
+    },
+    {
+      "id": "beshkan",
+      "name": "Beshkan",
+      "nameFa": "بشکن",
+      "provider": "Beshkan",
+      "primary": "181.41.194.177",
+      "secondary": "181.41.194.186",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Alternative bypass resolver for gaming storefronts.",
+      "latency": 55,
+      "uptime": 97.9
+    },
+    {
+      "id": "shecan-2",
+      "name": "Shecan Alt",
+      "nameFa": "شکن ۲",
+      "provider": "Shecan",
+      "primary": "178.22.122.101",
+      "secondary": "185.51.200.1",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Secondary Shecan pair at the same domestic edge.",
+      "latency": 39,
+      "uptime": 99.6
+    },
+    {
+      "id": "begzar-2",
+      "name": "Begzar Alt",
+      "nameFa": "بگذر ۲",
+      "provider": "Begzar",
+      "primary": "185.55.224.24",
+      "secondary": "",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Single-address Begzar endpoint used as a fallback.",
+      "latency": 51,
+      "uptime": 97.4
+    },
+    {
+      "id": "hamrah-aval",
+      "name": "Hamrah Aval",
+      "nameFa": "همراه اول",
+      "provider": "MCI",
+      "primary": "208.67.220.200",
+      "secondary": "208.67.222.222",
+      "category": "general",
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
+      "description": "Mobile carrier resolver, carrier-grade NAT friendly.",
+      "latency": 61,
+      "uptime": 98.6
+    },
+    {
+      "id": "irancell",
+      "name": "Irancell",
+      "nameFa": "ایرانسل",
+      "provider": "MTN Irancell",
+      "primary": "74.82.42.42",
+      "secondary": "0.0.0.0",
+      "category": "general",
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
+      "description": "Mobile network resolver; secondary entry is unpublished.",
+      "latency": 67,
+      "uptime": 98.1
+    },
+    {
+      "id": "rightel",
+      "name": "Rightel",
+      "nameFa": "رایتل",
+      "provider": "Rightel",
+      "primary": "91.239.100.100",
+      "secondary": "89.223.43.71",
+      "category": "general",
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
+      "description": "Mobile carrier pair with domestic cache nodes.",
+      "latency": 69,
+      "uptime": 97.8
+    },
+    {
+      "id": "nobarcloud",
+      "name": "NobarCloud",
+      "nameFa": "نوبر کلاود",
+      "provider": "NobarCloud",
+      "primary": "78.110.120.220",
+      "secondary": "78.110.120.200",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran",
+        "cloud"
+      ],
+      "description": "IaaS-focused resolver for cloud provider domains.",
+      "latency": 46,
+      "uptime": 98.9
+    },
+    {
+      "id": "dynx",
+      "name": "DynX",
+      "nameFa": "دایناکس",
+      "provider": "DynX",
+      "primary": "193.24.103.1",
+      "secondary": "193.24.103.2",
+      "category": "gaming",
+      "tags": [
+        "gaming",
+        "iran"
+      ],
+      "description": "Low-overhead resolver used for competitive gaming routes.",
+      "latency": 29,
+      "uptime": 99
+    },
+    {
+      "id": "bertina",
+      "name": "Bertina",
+      "nameFa": "برتینا",
+      "provider": "Bertina",
+      "primary": "193.186.32.32",
+      "secondary": "",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "iran"
+      ],
+      "description": "Single-address bypass resolver.",
+      "latency": 48,
+      "uptime": 98.3
+    },
+    {
+      "id": "hostiran",
+      "name": "HostIran",
+      "nameFa": "هاست ایران",
+      "provider": "HostIran",
+      "primary": "172.29.0.100",
+      "secondary": "172.29.2.100",
+      "category": "general",
+      "tags": [
+        "datacenter",
+        "iran"
+      ],
+      "description": "Private datacenter resolver; best on hosted networks.",
+      "latency": 27,
+      "uptime": 99.5
+    },
+    {
+      "id": "vanilla",
+      "name": "Vanilla",
+      "nameFa": "وانیلا",
+      "provider": "Vanilla",
+      "primary": "10.139.177.21",
+      "secondary": "10.139.177.22",
+      "category": "sanction",
+      "tags": [
+        "bypass",
+        "private"
+      ],
+      "description": "Private-range bypass resolver for peering partners.",
+      "latency": 34,
+      "uptime": 96.9
+    },
+    {
+      "id": "opendns",
+      "name": "OpenDNS",
+      "nameFa": "اوپن دی‌ان‌اس",
+      "provider": "Cisco",
+      "primary": "208.67.222.222",
+      "secondary": "208.67.220.220",
+      "category": "general",
+      "tags": [
+        "general",
+        "filtering",
+        "global"
+      ],
+      "description": "Global resolver with optional content filtering.",
+      "latency": 74,
+      "uptime": 99.9,
+      "ipv6": [
+        "2620:119:35::35",
+        "2620:119:53::53"
+      ]
+    },
+    {
+      "id": "comodo",
+      "name": "Comodo Secure",
+      "nameFa": "کومودو",
+      "provider": "Comodo",
+      "primary": "8.26.56.26",
+      "secondary": "8.20.247.20",
+      "category": "security",
+      "tags": [
+        "security",
+        "global"
+      ],
+      "description": "Threat-intelligence backed secure resolver.",
+      "latency": 88,
+      "uptime": 99.3
+    },
+    {
+      "id": "alternate-dns",
+      "name": "Alternate DNS",
+      "nameFa": "آلترنیت",
+      "provider": "Alternate",
+      "primary": "76.76.19.19",
+      "secondary": "76.223.122.150",
+      "category": "general",
+      "tags": [
+        "general",
+        "adblock",
+        "global"
+      ],
+      "description": "Ad-blocking anycast network with multiple families.",
+      "latency": 79,
+      "uptime": 99
+    },
+    {
+      "id": "control-d",
+      "name": "Control D",
+      "nameFa": "کنترل دی",
+      "provider": "Control D",
+      "primary": "76.76.2.0",
+      "secondary": "76.76.10.0",
+      "category": "security",
+      "tags": [
+        "security",
+        "custom-rules",
+        "global"
+      ],
+      "description": "Policy-driven resolver with per-device filtering.",
+      "latency": 62,
+      "uptime": 99.6
+    },
+    {
+      "id": "yandex",
+      "name": "Yandex DNS",
+      "nameFa": "یاندکس",
+      "provider": "Yandex",
+      "primary": "77.88.8.8",
+      "secondary": "77.88.8.1",
+      "category": "general",
+      "tags": [
+        "general",
+        "global"
+      ],
+      "description": "Regional resolver with family-safe variants.",
+      "latency": 76,
+      "uptime": 99.4
+    },
+    {
+      "id": "cisco",
+      "name": "Cisco Umbrella",
+      "nameFa": "سیسکو آمبرلا",
+      "provider": "Cisco",
+      "primary": "208.67.222.222",
+      "secondary": "208.67.222.20",
+      "category": "security",
+      "tags": [
+        "security",
+        "enterprise"
+      ],
+      "description": "Enterprise threat protection endpoint.",
+      "latency": 83,
+      "uptime": 99.8
+    },
+    {
+      "id": "verisign",
+      "name": "Verisign",
+      "nameFa": "وریساین",
+      "provider": "Verisign",
+      "primary": "64.6.64.6",
+      "secondary": "64.6.65.6",
+      "category": "general",
+      "tags": [
+        "general",
+        "privacy",
+        "global"
+      ],
+      "description": "Privacy-first public resolver, no query logging.",
+      "latency": 91,
+      "uptime": 99.5
     }
+  ]
 }
