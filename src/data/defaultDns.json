@@ -11,7 +11,11 @@
       "primary": "78.157.42.100",
       "secondary": "78.157.42.101",
       "category": "gaming",
-      "tags": ["gaming", "low-ping", "iran"],
+      "tags": [
+        "gaming",
+        "low-ping",
+        "iran"
+      ],
       "description": "Iranian gaming resolver tuned for low-latency matchmaking and console traffic.",
       "latency": 24,
       "uptime": 99.7,
@@ -25,7 +29,11 @@
       "primary": "10.202.10.10",
       "secondary": "10.202.10.11",
       "category": "gaming",
-      "tags": ["gaming", "console", "iran"],
+      "tags": [
+        "gaming",
+        "console",
+        "iran"
+      ],
       "description": "Game-first DNS with domestic peering for PlayStation, Xbox and Steam.",
       "latency": 31,
       "uptime": 99.4,
@@ -39,7 +47,11 @@
       "primary": "178.22.122.100",
       "secondary": "185.51.200.2",
       "category": "sanction",
-      "tags": ["sanction", "bypass", "iran"],
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
       "description": "The classic sanction-bypass resolver for developer and AI services.",
       "latency": 38,
       "uptime": 99.9,
@@ -53,7 +65,11 @@
       "primary": "10.202.10.202",
       "secondary": "10.202.10.102",
       "category": "sanction",
-      "tags": ["sanction", "bypass", "iran"],
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
       "description": "High-throughput bypass DNS for streaming and developer platforms.",
       "latency": 42,
       "uptime": 99.2,
@@ -67,7 +83,11 @@
       "primary": "185.55.226.26",
       "secondary": "185.55.225.25",
       "category": "sanction",
-      "tags": ["sanction", "bypass", "iran"],
+      "tags": [
+        "sanction",
+        "bypass",
+        "iran"
+      ],
       "description": "Sanction bypass with aggressive cache for fast repeat lookups.",
       "latency": 47,
       "uptime": 98.8
@@ -80,11 +100,18 @@
       "primary": "1.1.1.1",
       "secondary": "1.0.0.1",
       "category": "general",
-      "tags": ["general", "anycast", "privacy"],
+      "tags": [
+        "general",
+        "anycast",
+        "privacy"
+      ],
       "description": "Global anycast resolver with strong privacy guarantees.",
       "latency": 52,
       "uptime": 100,
-      "ipv6": ["2606:4700:4700::1111", "2606:4700:4700::1001"]
+      "ipv6": [
+        "2606:4700:4700::1111",
+        "2606:4700:4700::1001"
+      ]
     },
     {
       "id": "google",
@@ -94,11 +121,17 @@
       "primary": "8.8.8.8",
       "secondary": "8.8.4.4",
       "category": "general",
-      "tags": ["general", "global"],
+      "tags": [
+        "general",
+        "global"
+      ],
       "description": "Widely peered public resolver with dependable global routing.",
       "latency": 58,
       "uptime": 100,
-      "ipv6": ["2001:4860:4860::8888", "2001:4860:4860::8844"]
+      "ipv6": [
+        "2001:4860:4860::8888",
+        "2001:4860:4860::8844"
+      ]
     },
     {
       "id": "quad9",
@@ -108,11 +141,18 @@
       "primary": "9.9.9.9",
       "secondary": "149.112.112.112",
       "category": "security",
-      "tags": ["security", "malware-block", "global"],
+      "tags": [
+        "security",
+        "malware-block",
+        "global"
+      ],
       "description": "Blocks known malicious domains using threat intelligence feeds.",
       "latency": 64,
       "uptime": 99.9,
-      "ipv6": ["2620:fe::fe", "2620:fe::9"]
+      "ipv6": [
+        "2620:fe::fe",
+        "2620:fe::9"
+      ]
     },
     {
       "id": "adguard",
@@ -122,7 +162,11 @@
       "primary": "94.140.14.14",
       "secondary": "94.140.15.15",
       "category": "security",
-      "tags": ["security", "adblock", "global"],
+      "tags": [
+        "security",
+        "adblock",
+        "global"
+      ],
       "description": "Filters ads and trackers at the DNS layer.",
       "latency": 71,
       "uptime": 99.8
@@ -135,7 +179,11 @@
       "primary": "85.15.1.14",
       "secondary": "85.15.1.15",
       "category": "sanction",
-      "tags": ["bypass", "iran", "isp"],
+      "tags": [
+        "bypass",
+        "iran",
+        "isp"
+      ],
       "description": "ISP resolver with domestic latency advantages.",
       "latency": 33,
       "uptime": 98.5
@@ -148,7 +196,10 @@
       "primary": "78.157.60.6",
       "secondary": "78.157.60.242",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Domestic bypass resolver for blocked developer services.",
       "latency": 36,
       "uptime": 99.1
@@ -161,7 +212,10 @@
       "primary": "91.92.250.185",
       "secondary": "91.92.244.233",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Secondary Shelter endpoint on alternate network paths.",
       "latency": 44,
       "uptime": 98.2
@@ -174,7 +228,10 @@
       "primary": "181.41.194.177",
       "secondary": "181.41.194.186",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Alternative bypass resolver for gaming storefronts.",
       "latency": 55,
       "uptime": 97.9
@@ -187,7 +244,10 @@
       "primary": "178.22.122.101",
       "secondary": "185.51.200.1",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Secondary Shecan pair at the same domestic edge.",
       "latency": 39,
       "uptime": 99.6
@@ -200,7 +260,10 @@
       "primary": "185.55.224.24",
       "secondary": "",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Single-address Begzar endpoint used as a fallback.",
       "latency": 51,
       "uptime": 97.4
@@ -213,7 +276,11 @@
       "primary": "208.67.220.200",
       "secondary": "208.67.222.222",
       "category": "general",
-      "tags": ["isp", "iran", "mobile"],
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
       "description": "Mobile carrier resolver, carrier-grade NAT friendly.",
       "latency": 61,
       "uptime": 98.6
@@ -226,7 +293,11 @@
       "primary": "74.82.42.42",
       "secondary": "0.0.0.0",
       "category": "general",
-      "tags": ["isp", "iran", "mobile"],
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
       "description": "Mobile network resolver; secondary entry is unpublished.",
       "latency": 67,
       "uptime": 98.1
@@ -239,7 +310,11 @@
       "primary": "91.239.100.100",
       "secondary": "89.223.43.71",
       "category": "general",
-      "tags": ["isp", "iran", "mobile"],
+      "tags": [
+        "isp",
+        "iran",
+        "mobile"
+      ],
       "description": "Mobile carrier pair with domestic cache nodes.",
       "latency": 69,
       "uptime": 97.8
@@ -252,7 +327,11 @@
       "primary": "78.110.120.220",
       "secondary": "78.110.120.200",
       "category": "sanction",
-      "tags": ["bypass", "iran", "cloud"],
+      "tags": [
+        "bypass",
+        "iran",
+        "cloud"
+      ],
       "description": "IaaS-focused resolver for cloud provider domains.",
       "latency": 46,
       "uptime": 98.9
@@ -265,10 +344,13 @@
       "primary": "193.24.103.1",
       "secondary": "193.24.103.2",
       "category": "gaming",
-      "tags": ["gaming", "iran"],
+      "tags": [
+        "gaming",
+        "iran"
+      ],
       "description": "Low-overhead resolver used for competitive gaming routes.",
       "latency": 29,
-      "uptime": 99.0
+      "uptime": 99
     },
     {
       "id": "bertina",
@@ -278,7 +360,10 @@
       "primary": "193.186.32.32",
       "secondary": "",
       "category": "sanction",
-      "tags": ["bypass", "iran"],
+      "tags": [
+        "bypass",
+        "iran"
+      ],
       "description": "Single-address bypass resolver.",
       "latency": 48,
       "uptime": 98.3
@@ -291,7 +376,10 @@
       "primary": "172.29.0.100",
       "secondary": "172.29.2.100",
       "category": "general",
-      "tags": ["datacenter", "iran"],
+      "tags": [
+        "datacenter",
+        "iran"
+      ],
       "description": "Private datacenter resolver; best on hosted networks.",
       "latency": 27,
       "uptime": 99.5
@@ -304,7 +392,10 @@
       "primary": "10.139.177.21",
       "secondary": "10.139.177.22",
       "category": "sanction",
-      "tags": ["bypass", "private"],
+      "tags": [
+        "bypass",
+        "private"
+      ],
       "description": "Private-range bypass resolver for peering partners.",
       "latency": 34,
       "uptime": 96.9
@@ -317,11 +408,18 @@
       "primary": "208.67.222.222",
       "secondary": "208.67.220.220",
       "category": "general",
-      "tags": ["general", "filtering", "global"],
+      "tags": [
+        "general",
+        "filtering",
+        "global"
+      ],
       "description": "Global resolver with optional content filtering.",
       "latency": 74,
       "uptime": 99.9,
-      "ipv6": ["2620:119:35::35", "2620:119:53::53"]
+      "ipv6": [
+        "2620:119:35::35",
+        "2620:119:53::53"
+      ]
     },
     {
       "id": "comodo",
@@ -331,7 +429,10 @@
       "primary": "8.26.56.26",
       "secondary": "8.20.247.20",
       "category": "security",
-      "tags": ["security", "global"],
+      "tags": [
+        "security",
+        "global"
+      ],
       "description": "Threat-intelligence backed secure resolver.",
       "latency": 88,
       "uptime": 99.3
@@ -344,10 +445,14 @@
       "primary": "76.76.19.19",
       "secondary": "76.223.122.150",
       "category": "general",
-      "tags": ["general", "adblock", "global"],
+      "tags": [
+        "general",
+        "adblock",
+        "global"
+      ],
       "description": "Ad-blocking anycast network with multiple families.",
       "latency": 79,
-      "uptime": 99.0
+      "uptime": 99
     },
     {
       "id": "control-d",
@@ -357,7 +462,11 @@
       "primary": "76.76.2.0",
       "secondary": "76.76.10.0",
       "category": "security",
-      "tags": ["security", "custom-rules", "global"],
+      "tags": [
+        "security",
+        "custom-rules",
+        "global"
+      ],
       "description": "Policy-driven resolver with per-device filtering.",
       "latency": 62,
       "uptime": 99.6
@@ -370,21 +479,28 @@
       "primary": "77.88.8.8",
       "secondary": "77.88.8.1",
       "category": "general",
-      "tags": ["general", "global"],
+      "tags": [
+        "general",
+        "global"
+      ],
       "description": "Regional resolver with family-safe variants.",
       "latency": 76,
       "uptime": 99.4
     },
     {
-      "id": "cisco",
-      "name": "Cisco Umbrella",
-      "nameFa": "سیسکو آمبرلا",
-      "provider": "Cisco",
-      "primary": "208.67.222.222",
-      "secondary": "208.67.222.20",
+      "id": "opendns-family",
+      "name": "OpenDNS FamilyShield",
+      "nameFa": "اوپن‌دی‌ان‌اس فمیلی‌شیلد",
+      "provider": "OpenDNS",
+      "primary": "208.67.222.123",
+      "secondary": "208.67.220.123",
       "category": "security",
-      "tags": ["security", "enterprise"],
-      "description": "Enterprise threat protection endpoint.",
+      "tags": [
+        "security",
+        "family",
+        "parental"
+      ],
+      "description": "Family-safe resolver that blocks adult content at the DNS layer.",
       "latency": 83,
       "uptime": 99.8
     },
@@ -396,7 +512,11 @@
       "primary": "64.6.64.6",
       "secondary": "64.6.65.6",
       "category": "general",
-      "tags": ["general", "privacy", "global"],
+      "tags": [
+        "general",
+        "privacy",
+        "global"
+      ],
       "description": "Privacy-first public resolver, no query logging.",
       "latency": 91,
       "uptime": 99.5

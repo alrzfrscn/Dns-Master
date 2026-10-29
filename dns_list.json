@@ -488,18 +488,19 @@
       "uptime": 99.4
     },
     {
-      "id": "cisco",
-      "name": "Cisco Umbrella",
-      "nameFa": "سیسکو آمبرلا",
-      "provider": "Cisco",
-      "primary": "208.67.222.222",
-      "secondary": "208.67.222.20",
+      "id": "opendns-family",
+      "name": "OpenDNS FamilyShield",
+      "nameFa": "اوپن‌دی‌ان‌اس فمیلی‌شیلد",
+      "provider": "OpenDNS",
+      "primary": "208.67.222.123",
+      "secondary": "208.67.220.123",
       "category": "security",
       "tags": [
         "security",
-        "enterprise"
+        "family",
+        "parental"
       ],
-      "description": "Enterprise threat protection endpoint.",
+      "description": "Family-safe resolver that blocks adult content at the DNS layer.",
       "latency": 83,
       "uptime": 99.8
     },

@@ -1,257 +1,132 @@
-# Dns Master
-
 <div align="center">
 
-<img src="assets/app-icon.png" width="128" alt="Dns Master icon" />
+<img src="./assets/banner.png" alt="Dns Master Banner" width="100%" />
 
-**A native Windows control deck for DNS resolvers — benchmark, switch, verify, and persist.**
+<br />
 
-[![Version](https://img.shields.io/badge/version-v1.0.0-00D4AA?style=flat-square)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
-[![Rust](https://img.shields.io/badge/Rust-1.77%2B-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev)
-[![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![License](https://img.shields.io/badge/License-MIT-5A67D8?style=flat-square)](LICENSE)
+# ⚡ Dns Master
 
-[![Download](https://img.shields.io/badge/Download-.exe%20%2F%20.msi-00D4AA?style=flat-square&logo=windows&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![Stars](https://img.shields.io/github/stars/alrzfrscn/Dns-Master?style=flat-square&color=F0B323&logo=github)](https://github.com/alrzfrscn/Dns-Master/stargazers)
-[![Issues](https://img.shields.io/github/issues/alrzfrscn/Dns-Master?style=flat-square&color=E05D44&logo=github)](https://github.com/alrzfrscn/Dns-Master/issues)
+**Next-Generation Windows DNS Changer, RFC 1035 Benchmark Engine & Live Win32 Network Telemetry Deck**
 
-**[⬇ Download the latest release](https://github.com/alrzfrscn/Dns-Master/releases)** · `.exe` installer · `.msi` package
+[![English](https://img.shields.io/badge/Language-English-00F0FF?style=for-the-badge)](./README.md)
+[![Persian](https://img.shields.io/badge/زبان-فارسی-A855F7?style=for-the-badge)](./README.fa.md)
+
+[![Release](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=flat-square&logo=github&color=00F0FF)](https://github.com/alrzfrscn/Dns-Master/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20(x64)-0078D6?style=flat-square&logo=windows)](https://github.com/alrzfrscn/Dns-Master/releases)
+[![Tauri](https://img.shields.io/badge/Tauri-v2.12-FFC131?style=flat-square&logo=tauri&logoColor=black)](https://v2.tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-windows--sys%20Native-DEA584?style=flat-square&logo=rust)](https://www.rust-lang.org/)
+[![React](https://img.shields.io/badge/React-19%20%2B%20TypeScript-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![License](https://img.shields.io/badge/License-MIT-10B981?style=flat-square)](./LICENSE)
+
+<p align="center">
+  <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ Download Latest Installer (.msi / .exe)</strong></a>
+  ·
+  <a href="./README.fa.md"><strong>🇮🇷 مستندات فارسی</strong></a>
+  ·
+  <a href="./docs/ARCHITECTURE.md"><strong>📐 System Architecture</strong></a>
+  ·
+  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 Report Bug / Request DNS</strong></a>
+</p>
+
+<img src="./assets/dashboard.png" alt="Dns Master Dashboard" width="100%" />
 
 </div>
 
 ---
 
-## Why Dns Master?
+## 🎯 Why Dns Master?
 
-| Before | After |
-|:---|:---|
-| Slow, unreliable DNS | Benchmarked, optimal resolvers |
-| Manual `netsh` commands | One-click apply with rollback |
-| Guessing which resolver is fastest | Real latency, jitter & packet loss |
-| Sanctions blocking access | TLS SNI bypass verification |
-| Settings lost on reboot | Atomic, persistent state |
+Most Windows DNS switchers rely on legacy UI frameworks, spawn visible `cmd.exe` windows, or use simple ICMP `ping` (which many DNS providers block or anycast-spoof). **Dns Master** is engineered from the ground up in **Rust (`windows-sys`)** and **React 19** to deliver a zero-bloat, gaming-grade network control deck.
 
----
-
-## Feature Highlights
-
-### 📡 Zero-CPU Win32 Live Telemetry
-Per-adapter byte counters straight from `GetIfTable2`, streamed at 1 Hz with session totals and peak tracking. No sampling daemon, no console window, no background CPU burn.
-
-### ⚡ RFC 1035 UDP:53 Parallel Benchmark
-A real DNS benchmark over raw UDP:53 with a bounded 15-thread sweep. Latency, jitter and packet loss stream into the table as each probe finishes.
-
-### 🛡️ TLS SNI Sanction Bypass Prober
-Resolves six real targets (Docker Hub, GitHub, OpenAI, Hugging Face, Steam, EA), rejects sinkholes and bogons, then proves port 443 with a real ClientHello carrying the correct SNI.
-
-### 🔍 Locale-Neutral Registry DNS Reader
-Reads `Tcpip\Parameters\Interfaces\{GUID}` directly from the registry — no parsing of localized `netsh` output, so it works on every Windows language.
-
-### 🔐 UAC-Safe Netsh Writer with Rollback
-Applies resolvers hidden and unelevated, retries through a UAC prompt only when Windows refuses, verifies the read-back before reporting success, and keeps the previous resolver for one-click rollback.
-
-### 🖥️ System Tray & Community GitHub JSON Sync
-Close-to-tray, quick engage, DHCP reset and cache flush from the tray menu. Pull community resolver lists from any HTTPS GitHub raw URL — pins and real measurements survive every sync.
-
-### 💾 Atomic Persistent State
-Custom resolvers, synced rows, pins, settings and the rollback snapshot live in `%APPDATA%\com.dnsmaster.desktop\state.json`, written through a temp file and rename so a crash never truncates it.
-
-### 🔔 Native Notifications & JSON Import / Export
-Desktop notices for applies, resets and syncs. Export your own `{ "servers": [...] }` manifest and import it back through the same validator the sync uses.
+| Capability | Legacy DNS Tools | ⚡ Dns Master (`v1.0.0`) |
+| :--- | :--- | :--- |
+| **Latency Measurement** | Basic ICMP `ping` (often blocked or inaccurate) | **True RFC 1035 UDP:53 Wire Queries** + TCP:53 fallback & Jitter calculation |
+| **Sanction & Filtering Check** | None | **Live TLS/SNI Handshake Prober** + ISP Sinkhole (`10.10.34.x`) detection |
+| **Live Bandwidth Monitor** | None or heavy CPU polling | **Zero-CPU Win32 `GetIfTable2`** real-time 1s Download/Upload stream |
+| **DNS Read & Write Safety** | Blind `netsh` execution with CMD flashes | **Locale-neutral Registry Reader**, hidden `CREATE_NO_WINDOW`, read-back verification & **1-Click Rollback** |
+| **Resolver List Updates** | Hardcoded / Manual `.ini` edits | **1-Click GitHub Raw JSON Sync** + Local JSON Import/Export |
 
 ---
 
-## Installation
+## ✨ Core Features
 
-1. Open **[GitHub Releases](https://github.com/alrzfrscn/Dns-Master/releases)**.
-2. Download the installer for your machine:
-   - **`.exe`** — NSIS setup, user-level install, no admin required.
-   - **`.msi`** — WiX package for enterprise, administrative or silent deployment.
-3. Run it. WebView2 is built into Windows 11; on Windows 10 the installer pulls it in.
-
-> Requires Windows 10/11 x64. Built with Tauri 2, so the download is small and the UI is native-fast.
-
----
-
-## Quick Start
-
-```mermaid
-flowchart LR
-    A[Launch Dns Master] --> B[Select adapter]
-    B --> C[Run benchmark]
-    C --> D[Compare latency / jitter / loss]
-    D --> E[Apply best resolver]
-    E --> F[Verify & rollback anytime]
-```
-
-1. **Launch** Dns Master from the Start Menu or the tray.
-2. **Select** your active network adapter.
-3. **Benchmark** every resolver with one click.
-4. **Review** and sort by latency, jitter or packet loss.
-5. **Apply** the winner — the previous DNS is kept for rollback.
-6. **Persist** your preferences in Settings.
+- 🔮 **Obsidian Glassmorphism HUD (`1100×720`)** — Frameless dark interface with real-time Recharts telemetry, route radar, and keyboard shortcuts (`Ctrl+1…4`).
+- 🚀 **Parallel UDP:53 Benchmark Engine** — Sweeps 30+ Global and Iranian resolvers concurrently using bounded worker threads in under 2 seconds, streaming live per-server progress.
+- 🛡️ **Sanction Bypass Matrix** — Tests real DNS resolution and port `443` TLS SNI reachability across **Docker Hub, GitHub, OpenAI API, Hugging Face, Steam Store, and EA Online**.
+- 🔌 **Smart Multi-Adapter Detection** — Enumerates physical (`Wi-Fi`, `Ethernet`) and virtual/VPN interfaces via `GetAdaptersAddresses` and `GetIpForwardTable2`, automatically highlighting the active default route.
+- 🔒 **IPv6 Leak Guard** — Prevents ISP IPv6 DNS leaks by binding the interface's IPv6 resolver to loopback (`::1`) without disabling the Windows IPv6 stack.
+- ⏪ **Transactional DNS Rollback** — Automatically snapshots your previous adapter configuration before applying a new DNS so you can restore it in one click.
+- 🖥️ **System Tray & Silent Autostart** — Minimizes cleanly to the Windows System Tray for instant 1-click switching (`Engage Electro`, `Reset DHCP`, `Flush DNS`) and supports `HKCU\...\Run` startup (`--minimized`).
 
 ---
 
-## Community Resolver List
+## 📥 Installation (Windows 10 / 11)
 
-The default sync URL points at this repository's [`dns_list.json`](dns_list.json), so **SYNC NOW** works out of the box:
+1. Go to the [**Releases Page**](https://github.com/alrzfrscn/Dns-Master/releases).
+2. Download the latest **`Dns.Master_1.0.0_x64-setup.exe`** or **`Dns.Master_1.0.0_x64_en-US.msi`**.
+3. Run the installer and launch **Dns Master**.
+   > **Note on UAC Elevation:** Reading telemetry, benchmarking UDP:53, and flushing DNS cache require **zero** admin privileges. Windows UAC permission is requested *only* when writing a new DNS to a network adapter.
 
-```
+---
+
+## 🌐 Community DNS List & GitHub Sync (`dns_list.json`)
+
+**Dns Master** can pull updated DNS servers directly from GitHub inside **Settings → Resolver Source** (or the **Sync** button in **DNS Vault**).
+
+Default Community Manifest URL:
+```text
 https://raw.githubusercontent.com/alrzfrscn/Dns-Master/main/dns_list.json
 ```
 
-The manifest is a versioned `{ "version": 1, "servers": [...] }` document. Each entry:
+### 🤝 Contribute a New DNS Server (Pull Request)
+Know a fast gaming or sanction-bypass DNS? Add it to [`dns_list.json`](./dns_list.json) and open a Pull Request! Once merged, every Dns Master user gets it immediately via the **Sync** button.
 
 ```json
 {
-  "id": "electro",
-  "name": "Electro",
-  "nameFa": "الکترو",
-  "provider": "Electro",
-  "primary": "78.157.42.100",
-  "secondary": "78.157.42.101",
-  "category": "gaming",
-  "tags": ["gaming", "low-ping", "iran"],
-  "description": "Low-latency gaming resolver"
+  "version": 1,
+  "servers": [
+    {
+      "id": "electro",
+      "name": "Electro",
+      "provider": "Electro Team · الکترو",
+      "primary": "78.157.42.100",
+      "secondary": "78.157.42.101",
+      "category": "gaming",
+      "location": "IR · Tehran",
+      "tags": ["gaming", "bypass", "iran"]
+    }
+  ]
 }
 ```
-
-| Field | Required | Type | Notes |
-|-------|:--------:|------|-------|
-| `id` | ✅ | `string` | Unique slug |
-| `name` | ✅ | `string` | Display name |
-| `primary` | ✅ | `IPv4` | Must not be `0.0.0.0` |
-| `secondary` | ❌ | `IPv4` | Empty string allowed |
-| `nameFa` | ❌ | `string` | Persian display name |
-| `provider` | ❌ | `string` | Provider / organization |
-| `category` | ❌ | `enum` | `gaming` · `sanction` · `security` · `general` |
-| `tags` | ❌ | `string[]` | Filterable tags |
-| `description` | ❌ | `string` | Human-readable note |
-
-Validation is strict: one invalid entry rejects the whole manifest, duplicate primaries collapse (first wins), and sync is HTTPS-only.
-
-### Add your resolver
-
-1. Fork this repository.
-2. Add or edit an entry in [`dns_list.json`](dns_list.json) — gaming, low-ping or sanction-bypass resolvers are welcome.
-3. Keep the JSON valid and the `primary` address unique.
-4. Open a Pull Request describing the resolver and where it is useful.
-
-Community lists can also be hosted anywhere public and pasted into **Settings → Resolver Source**.
+*Supported categories:* `"gaming"` | `"sanction"` | `"security"` | `"general"`
 
 ---
 
-## Development
+## 🛠️ Tech Stack & Development
 
-### Prerequisites
+- **Frontend:** React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts, Lucide Icons, Self-hosted `@fontsource` (`Oxanium`, `Sora`, `JetBrains Mono`).
+- **Backend (`src-tauri`):** Rust, Tauri v2, direct Win32 API via `windows-sys` (`IpHelper`, `Ndis`, `WinSock`, `Registry`), pure-`std` RFC 1035 DNS wire parser & TLS ClientHello SNI prober.
+- **Architecture Deep-Dive:** Read [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for full IPC contracts and internals.
 
-- Windows 10/11 x64
-- Node.js 20+
-- Rust 1.77.2+ with the MSVC toolchain (`rustup default stable-msvc`)
-- WebView2 Runtime
+### Build from Source
 
 ```powershell
-git clone https://github.com/alrzfrscn/Dns-Master.git
-cd Dns-Master
+# 1. Install frontend dependencies
 npm install
 
-npm run dev          # Vite UI only
-npm run tauri:dev    # full native shell
-npm run build        # type-check + production frontend
-npm run tauri:build  # Windows .exe / .msi installers
+# 2. Run in development mode (Vite + Tauri native window)
+npm run tauri dev
+
+# 3. Run Rust unit tests (46 tests) & frontend type-check
 cargo test --manifest-path src-tauri/Cargo.toml
-```
-
-### Project Layout
-
-```
-Dns-Master/
-├── src/                 # React 19 + TypeScript UI
-├── src-tauri/           # Rust backend (Tauri 2)
-│   └── src/
-│       ├── platform.rs  # Win32 registry, netsh, traffic, curl
-│       ├── dns.rs       # UDP:53 benchmark & TLS SNI probe
-│       ├── sync.rs      # GitHub manifest sync
-│       ├── store.rs     # Atomic state persistence
-│       └── autostart.rs # HKCU Run key
-├── dns_list.json        # Community resolver manifest
-├── docs/ARCHITECTURE.md # Architecture & engineering log
-└── .github/workflows/   # CI and tagged releases
-```
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full command contracts, state model and engineering log.
-
----
-
-## Security & Privacy
-
-- **No telemetry** — zero analytics, zero phone-home.
-- **Local-only state** — everything stays in `%APPDATA%`.
-- **HTTPS-only sync** — redirects cannot downgrade to `http` or `file`.
-- **Strict manifests** — malformed lists are rejected before they touch your system.
-- **UAC-aware** — never elevates silently.
-- **Open source** — read and audit every line.
-
----
-
-## Contributing
-
-Pull requests are welcome — resolver entries, localization, themes, DoH/DoT support, Windows integration tests and packaging manifests.
-
-```powershell
 npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
+
+# 4. Build production Windows installers (.exe & .msi)
+npm run tauri build
 ```
 
-Use conventional commit messages (`feat:`, `fix:`, `docs:`, `chore:`).
-
 ---
 
-## License
+## ⭐ Support the Project
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-<div dir="rtl">
-
-## نمای کلی فارسی
-
-**Dns Master** یک جعبه‌ابزار بومی ویندوز برای مدیریت و سنجش DNS است: رزولورها را با بنچمارک واقعی UDP:53 مقایسه می‌کند، بهترین را با یک کلیک اعمال می‌کند و تنظیمات قبلی را برای بازگردانی نگه می‌دارد.
-
-- 📡 **تلمتری زنده Win32** — آمار ترافیک هر آداپتور با مصرف پردازنده نزدیک به صفر
-- ⚡ **بنچمارک موازی RFC 1035** — تأخیر، جیتر و افت بسته به‌صورت زنده
-- 🛡️ **آزمایشگر عبور از تحریم TLS SNI** — بررسی واقعی اتصال ۴۴۳ به سرویس‌های تحریم‌شده
-- 🔍 **خواندن DNS از رجیستری** — مستقل از زبان ویندوز
-- 🔐 **نوشتن امن با UAC و بازگردانی** — اعمال، تأیید و برگشت با یک کلیک
-- 🔄 **همگام‌سازی لیست از GitHub** — دریافت لیست جامعه از آدرس HTTPS
-
-### نصب
-
-از صفحهٔ **[Releases](https://github.com/alrzfrscn/Dns-Master/releases)** فایل نصب `.exe` یا `.msi` را دانلود کنید. ویندوز ۱۰ و ۱۱ (۶۴ بیتی) پشتیبانی می‌شود.
-
-### مشارکت در لیست DNS
-
-اگر DNS گیمینگ، کم‌تأخیر یا مناسب عبور از تحریم می‌شناسید:
-
-1. مخزن را Fork کنید.
-2. رزولور جدید را به فایل [`dns_list.json`](dns_list.json) اضافه کنید.
-3. مقدار `primary` باید یک IPv4 معتبر و یکتا باشد.
-4. یک Pull Request با توضیح کاربرد رزولور باز کنید.
-
-لیست پیش‌فرض برنامه به همین فایل در شاخهٔ `main` متصل است، بنابراین تغییر شما پس از ادغام برای همهٔ کاربران با زدن **SYNC NOW** قابل دریافت است.
-
-</div>
-
----
-
-<div align="center">
-
-**Built with ❤️ for Windows users who want control over their DNS.**
-
-[⭐ Star this repo](https://github.com/alrzfrscn/Dns-Master) · [🐛 Report a bug](https://github.com/alrzfrscn/Dns-Master/issues/new) · [⬇ Releases](https://github.com/alrzfrscn/Dns-Master/releases)
-
-</div>
+If **Dns Master** helped lower your ping or bypass developer restrictions, please give the repository a **Star ⭐** and share it with your friends!
