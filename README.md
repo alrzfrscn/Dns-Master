@@ -6,19 +6,21 @@
 
 **A native Windows control deck for DNS resolvers — benchmark, switch, verify, and persist.**
 
-[![Version](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=for-the-badge&logo=github&logoColor=white&color=00D4AA)](https://github.com/alrzfrscn/Dns-Master/releases)
-[![License](https://img.shields.io/github/license/alrzfrscn/Dns-Master?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=5A67D8)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
-[![Rust](https://img.shields.io/badge/Rust-1.77%2B-DEA584?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Version](https://img.shields.io/github/v/release/alrzfrscn/Dns-Master?style=flat-square&color=00D4AA&logo=github)](https://github.com/alrzfrscn/Dns-Master/releases)
+[![Downloads](https://img.shields.io/github/downloads/alrzfrscn/Dns-Master/total?style=flat-square&color=blue&logo=github)](https://github.com/alrzfrscn/Dns-Master/releases)
+[![Stars](https://img.shields.io/github/stars/alrzfrscn/Dns-Master?style=flat-square&color=F0B323&logo=github)](https://github.com/alrzfrscn/Dns-Master/stargazers)
+[![License](https://img.shields.io/badge/License-MIT-5A67D8?style=flat-square)](LICENSE)
 
-[![Download Latest](https://img.shields.io/badge/Download-Latest%20Release-00D4AA?style=for-the-badge&logo=github&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/releases/latest)
-[![Telegram](https://img.shields.io/badge/Telegram-Contact%20Author-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ImGr8)
-[![Stars](https://img.shields.io/github/stars/alrzfrscn/Dns-Master?style=for-the-badge&logo=github&logoColor=white&color=F0B323)](https://github.com/alrzfrscn/Dns-Master/stargazers)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
+[![Rust](https://img.shields.io/badge/Rust-1.77%2B-DEA584?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+
+[![Download Latest](https://img.shields.io/badge/Download-Latest_Release-00D4AA?style=flat-square&logo=windows&logoColor=white)](https://github.com/alrzfrscn/Dns-Master/releases/latest)
+[![Telegram](https://img.shields.io/badge/Telegram-@ImGr8-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://t.me/ImGr8)
+[![Issues](https://img.shields.io/github/issues/alrzfrscn/Dns-Master?style=flat-square&color=E05D44&logo=github)](https://github.com/alrzfrscn/Dns-Master/issues)
 
 </div>
-
 ---
 
 ## ✨ Why DNS Master?
