@@ -1,11 +1,3 @@
-# NeonDNS — Phase 1 Agent Report
-
-Date: 2026-10-27
-Project: `D:\Project\Dns Master`
-Scope: Phase 1 (UI shell, simulated state, frozen Rust contracts)
-
----
-
 ## 1. Environment
 
 | Tool | Version |
