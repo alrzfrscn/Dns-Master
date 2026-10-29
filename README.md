@@ -3,7 +3,7 @@
 **Next-Generation Windows DNS Changer, RFC 1035 Benchmark Engine & Live Win32 Network Telemetry Deck**<div align="center">
 
 <p align="center">
-  <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ Download Latest Installer (.msi / .exe)</strong></a>
+  <a href="https://github.com/alrzfrscn/Dns-Master/releases"><strong>⬇️ Download Latest Installer</strong></a>
   ·
   <a href="./README.fa.md"><strong>🇮🇷 مستندات فارسی</strong></a>
   ·
