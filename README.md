@@ -21,7 +21,6 @@
 [![Issues](https://img.shields.io/github/issues/alrzfrscn/Dns-Master?style=flat-square&color=E05D44&logo=github)](https://github.com/alrzfrscn/Dns-Master/issues)
 
 </div>
----
 
 ## ✨ Why DNS Master?
 
