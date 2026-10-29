@@ -9,7 +9,9 @@
   ·
   <a href="./docs/ARCHITECTURE.md"><strong>📐 System Architecture</strong></a>
   ·
-  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 Report Bug / Request DNS</strong></a>
+  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>🐞 Report Bug</strong></a>
+  ·
+  <a href="https://github.com/alrzfrscn/Dns-Master/issues"><strong>➕ Request DNS</strong></a>
 </p>
 
 <br />
