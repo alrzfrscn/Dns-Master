@@ -16,7 +16,7 @@ function BrandMark() {
     <img
       src="/app-icon.png"
       alt="Dns Master"
-      className="h-9 w-9 rounded-xl object-cover ring-1 ring-neon/30 shadow-[0_0_18px_rgba(0,240,255,0.22)]"
+      className="w-10 h-10 rounded-[10px] object-contain shrink-0 drop-shadow-[0_0_12px_rgba(0,240,255,0.28)]"
       draggable={false}
     />
   );
